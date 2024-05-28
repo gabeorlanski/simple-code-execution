@@ -1,0 +1,27 @@
+[tool.isort]
+profile='black'
+single_line_exclusions = ["typing"]
+force_single_line = true
+skip = [".gitignore", ".dockerignore"]
+extend_skip_glob = [".vscode/*","scratch/*","debug_code/*", "repos/*", "data/*"]
+line_length = 80
+
+[tool.black]
+line-length=80
+extend-exclude='''
+(
+    ^/repos/*|^/data/*|^/scratch/linting/*
+)'''
+
+[tool.pylint]
+disable=['logging-fstring-interpolation']
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "--ignore=src --ignore=data"
+testpaths = [
+    "tests"
+]
+pythonpath = [
+  "."
+]

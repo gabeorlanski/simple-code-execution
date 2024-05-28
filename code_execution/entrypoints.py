@@ -259,11 +259,12 @@ def execute_predictions(
             all_results.extend(execute_commands(commands, config))
 
             logger.debug("Finished execution, cleaning up...")
-            cleanup(
-                files,
-                rate_limit=config.write_rate_limit,
-                disable_tqdm=config.disable_tqdm,
-            )
+            if debug_dir is None:
+                cleanup(
+                    files,
+                    rate_limit=config.write_rate_limit,
+                    disable_tqdm=config.disable_tqdm,
+                )
         all_results = {result[0]: result[1] for result in all_results}
         all_results.update(filtered_results)
         return postprocess_commands(

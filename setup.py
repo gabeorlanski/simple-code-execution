@@ -9,6 +9,7 @@ with open("requirements.txt") as reqs_file:
 
 setup(
     name="simple_code_execution",
+    version="0.0.1",
     python_requires=">=3.10",
     description="A simple code execution library for Python",
     long_description=readme,

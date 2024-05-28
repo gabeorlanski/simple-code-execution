@@ -17,6 +17,9 @@ from tqdm import tqdm
 from .configs import ExecutionConfig
 from .utils import get_results_from_generator
 
+LOGGING_IS_CONFIGURED = logging.getLogger().hasHandlers()
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -359,6 +362,8 @@ def _parallel_execute_code(
         is_batched=is_batched,
     )
 
+    progress_writer = logger.info if LOGGING_IS_CONFIGURED else print
+
     last_log = 0
     with mp.Pool(processes=num_executors) as pool:
         for result in pool.imap_unordered(threaded_fn, chunks):
@@ -374,7 +379,7 @@ def _parallel_execute_code(
                 eta = seconds_to_human((total_commands - len(results)) / rate)
                 interval_received = len(results)
                 rate_str = f"{rate:0.2f} P/S"
-                logger.info(
+                progress_writer(
                     f"{len(results):>9,}/{total_commands:<9,}({prog:0.2%}) @ {rate_str:<12}"
                     f" in {seconds_to_human(elapsed)} ETA: {eta}"
                 )

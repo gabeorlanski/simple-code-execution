@@ -14,6 +14,9 @@ from tqdm import tqdm
 
 from code_execution import utility_modules
 
+LOGGING_IS_CONFIGURED = logging.getLogger().hasHandlers()
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -135,6 +138,7 @@ def get_results_from_generator(
 
     # Create a counter for completed since the size of results will not
     # always go up by one.
+    write_fn = logger.info if LOGGING_IS_CONFIGURED else logger.debug
     num_completed = 0
     for r in generator:
         if target_returns_multiple:
@@ -143,7 +147,7 @@ def get_results_from_generator(
             results.append(r)
         num_completed += 1
         if disable_tqdm and num_completed % log_freq == 0:
-            print(f"Finished {num_completed}/{total}")
+            write_fn(f"Finished {num_completed}/{total}")
 
         if num_completed % garbage_collect_freq == 0:
             gc.collect()

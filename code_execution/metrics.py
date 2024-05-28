@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 def naive_process_result(result):
+    """The most naive way to process the result."""
     if result["failed"] or result["timed_out"]:
         return False
     return True

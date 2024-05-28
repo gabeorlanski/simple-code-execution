@@ -41,6 +41,7 @@ def is_simple_test_case(tree):
 
 
 def get_global_imports(tree: ast.Module) -> List[str]:
+    """ Get the global imports from an ast tree as a list of strings."""
     out = []
     for node in tree.body:
         if isinstance(node, ast.Import):
@@ -104,8 +105,20 @@ def convert_call_to_assert(
 
 
 def convert_test_list_to_assert(
-    test_list: List, timeout: float = -1.0, convert_to_string: bool = False
-) -> List[ast.AST]:
+    test_list: List[Union[Tuple[str,str,bool],str]], timeout: float = -1.0, convert_to_string: bool = False
+) -> List[Union[ast.AST, str]]:
+    """ Converts a list of test cases to assertion nodes.
+    
+    Args:
+        test_list: A list of test cases. Each test case can be a string or a tuple
+            of (call, output, requires_float). If the test case is a string, it will
+            be parsed as a call. If it is a tuple, it will be converted to an assertion.
+        timeout: The timeout for parsing the test cases.
+        convert_to_string: Whether to convert the resulting AST to a string.
+    
+    Returns:
+        A list of converted test cases as AST nodes or strings.
+    """
     out = []
     for tc in test_list:
         try:

@@ -57,6 +57,19 @@ def preprocess_commands(
     preproc_returns_list: bool = False,
     batch_size: int = 1,
 ) -> Tuple[List[Dict], List[Dict], Dict[Tuple[int, int], ExecutionResult]]:
+    """Preprocesses the commands to run.
+    Args:
+        config: The execution config.
+        dir_to_use: The directory to use for execution.
+        pred_list: The list of predictions.
+        preprocessor: The preprocessor to use.
+        preproc_returns_list: Whether the preprocessor returns a list of executables.
+        batch_size: The batch size to use for execution.
+    Returns:
+        files_to_write: The files to write to disk.
+        commands_to_run: The commands to run.
+        filtered_out: The results that were filtered out during preprocessing, these will be added back after execution.
+    """
     logger.debug("Creating Executables")
     executable_creator = wrap_processor(
         preprocessor,
@@ -126,9 +139,20 @@ def preprocess_commands(
 def postprocess_commands(
     raw_preds: Dict,
     results: Dict[Tuple[int, int], ExecutionResult],
-    postprocessor: Callable,
+    postprocessor: Callable[[Dict, ExecutionResult], Dict],
     returned_multiple: bool,
 ) -> List[Dict]:
+    """Postprocesses the commands after exeuction.
+
+    Args:
+        raw_preds (Dict): The raw predictions before postprocessing, used to add back information.
+        results (Dict[Tuple[int, int], ExecutionResult]): The results of executions where the key is used for ordering and the value is the result post execution.
+        postprocessor (Callable): The postprocessor function to use.
+        returned_multiple (bool): Whether the preprocessor returned multiple results per prediction.
+
+    Returns:
+        List[Dict]: The postprocessed results.
+    """
     logger.debug("Postprocessing %d predictions", len(results))
     if returned_multiple:
         logger.info("Multiple results per prediction, grouping them")
@@ -157,8 +181,23 @@ def execute_predictions(
     debug_dir: Path = None,
     preproc_returns_list: bool = False,
     preproc_batch_size: int = 1,
-    cache_dir: Path = None,
-):
+) -> List[Dict]:
+    """Executes the program predictions.
+
+    First preprocesses the commands to run, writes them to disk, then executes them, and finally postprocesses the results.
+
+    Args:
+        config (ExecutionConfig): The config for execution.
+        pred_list (List[Dict]): The list of predictions to execute.
+        preprocessor (Callable[[Dict], Union[Executable, List[Executable]]]): The preprocessor function to use to create the files and commands to execute.
+        postprocessor (Callable[[Dict, Dict], Dict], optional): _description_. Defaults to None.
+        debug_dir (Path, optional): The directory to use if you want to debug. This saves **all** files here and does not clean them up. Defaults to None.
+        preproc_returns_list (bool, optional): Is the preprocess function one-to-one or one-to-many. Defaults to False.
+        preproc_batch_size (int, optional): The batch size for preprocessing. Defaults to 1.
+
+    Returns:
+        List[Dict]: The executed predictions.
+    """
     if postprocessor is None:
         logger.info("Using default postprocessor")
         postprocessor = default_postprocessor

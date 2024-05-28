@@ -15,14 +15,13 @@ import psutil
 from tqdm import tqdm
 
 from .configs import ExecutionConfig
-from .utils import ContextTimeLimitException
 from .utils import get_results_from_generator
-from .utils import time_limit
 
 logger = logging.getLogger(__name__)
 
 
 def seconds_to_human(seconds):
+    """Converts seconds to a human readable format."""
     hours, seconds = divmod(seconds, 3600)
     minutes, seconds = divmod(seconds, 60)
     return f"{int(hours):02d}:{int(minutes):02d}:{seconds:05.2f}"
@@ -30,7 +29,16 @@ def seconds_to_human(seconds):
 
 @dataclasses.dataclass(frozen=True)
 class CommandResult:
-    """Dataclass for the result of executing a command."""
+    """Dataclass for the result of executing a command.
+
+    Args:
+        return_code: The return code.
+        runtime: The runtime.
+        stdout: The stdout.
+        stderr: The stderr.
+        timed_out: Whether the command timed out.
+        had_unexpected_error: Whether the command had an unexpected error.
+    """
 
     return_code: int
     runtime: float
@@ -42,30 +50,43 @@ class CommandResult:
 
 @dataclasses.dataclass(frozen=True)
 class ExecutionResult:
+    """Dataclass for the result of executing a list of commands.
+
+    Args:
+        command_results: The results of the commands.
+        elapsed: The elapsed time.
+        cwd: The current working directory.
+        tracked_files: The tracked files.
+    """
+
     command_results: List[CommandResult]
     elapsed: float
     cwd: str
     tracked_files: Dict[str, str]
 
     @property
-    def timed_out(self):
+    def timed_out(self) -> bool:
+        """Whether the last command timed out."""
         if not self.command_results:
             return False
         return self.command_results[-1].timed_out
 
     @property
-    def had_error(self):
+    def had_error(self) -> bool:
+        """Whether the last command had an error."""
         if not self.command_results:
             return True
         return self.command_results[-1].return_code != 0
 
     @property
-    def last_cmd(self):
+    def last_cmd(self) -> CommandResult:
+        """The last command result."""
         if not self.command_results:
             return None
         return self.command_results[-1]
 
-    def to_dict(self):
+    def to_dict(self) -> Dict:
+        """Converts the result to a dictionary."""
         return {
             "command_results": [
                 dataclasses.asdict(r) for r in self.command_results
@@ -85,6 +106,7 @@ class ExecutionResult:
         stderr: str = "Invalid",
         elapsed: float = 10.0,
     ) -> "ExecutionResult":
+        """Creates a dummy ExecutionResult that represents an invalid result. Useful for when your preprocessor finds a program you want to skip execution for."""
         return cls(
             command_results=[
                 CommandResult(
@@ -104,7 +126,8 @@ class ExecutionResult:
 
 def _execute(
     command_to_run: List[str], working_dir: pathlib.Path, timeout: int
-):
+) -> Dict:
+    """Executes a single command."""
     timed_out = False
     return_code = -1
     runtime = timeout
@@ -287,8 +310,21 @@ def _parallel_execute_code(
     num_executors: int,
     log_freq: int,
     is_batched: bool = False,
-    buffer_size: int = 100,
-):
+    execute_batch_size: int = 100,
+) -> List[ExecutionResult]:
+    """Executes a list of commands in parallel.
+
+    Args:
+        to_run: The list of commands to run.
+        max_processes: The maximum number of processes to run.
+        num_executors: The number of executors to run.
+        log_freq: The frequency to log progress.
+        is_batched: Whether the commands are batched.
+        execute_batch_size: The size of execution batches.
+
+    Returns:
+        The list of results.
+    """
     logger.info(
         "Starting parallel execution (max_processes=%d num_executors=%d)",
         max_processes,
@@ -297,7 +333,7 @@ def _parallel_execute_code(
     max_threads = max(max_processes // num_executors, 1)
     logger.debug("max_threads=%d", max_threads)
     manager_process = psutil.Process()
-    chunk_size = min(buffer_size, len(to_run) // max_threads)
+    chunk_size = min(execute_batch_size, len(to_run) // max_threads)
     logger.debug("chunk_size=%d", chunk_size)
     # initialize cpu percent
     psutil.getloadavg()
@@ -369,7 +405,8 @@ def _parallel_execute_code(
 def execute_commands(
     predictions,
     config: ExecutionConfig,
-):
+) -> List[ExecutionResult]:
+    """Executes a list of commands."""
     logger.debug("Executing %d predictions", len(predictions))
 
     if config.batched:
@@ -394,7 +431,7 @@ def execute_commands(
             num_executors=config.num_executors,
             is_batched=config.batched,
             log_freq=config.log_freq,
-            buffer_size=config.buffer_size,
+            execute_batch_size=config.buffer_size,
         )
     else:
         logger.debug("Running in serial as num_workers=1")

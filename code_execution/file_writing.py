@@ -108,6 +108,16 @@ async def _async_cleanup(
 
 
 def cleanup(files: List[Tuple], rate_limit: int, disable_tqdm: bool):
+    """Cleans up the executables on the disk.
+
+    Args:
+        files (List[Tuple]): The list of files to clean up.
+        rate_limit (int): The rate limit (# threads) for cleaning up the files.
+        disable_tqdm (bool): Disable the progress bars.
+
+    Raises:
+        ValueError: If the prediction directory exists after cleanup.
+    """
     logger.debug(
         "Cleaning up %d predictions with rate limit of %s",
         len(files),

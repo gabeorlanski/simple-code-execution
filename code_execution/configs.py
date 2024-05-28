@@ -19,6 +19,9 @@ class ExecutionConfig:
         execution_chunk_size: The chunk size for execution.
         default_timeout: The default timeout for execution.
         max_execute_at_once: The maximum number of predictions to execute at a single time.
+        num_executors: The number of executor processes running.
+        log_freq: How often to log progress.
+        buffer_size: Chunk size to use for execution.
     """
 
     num_workers: int
@@ -32,7 +35,6 @@ class ExecutionConfig:
     num_executors: int = 4
     log_freq: int = 1000
     buffer_size: int = 100
-    _convert_: str = "object"
 
     def __post_init__(self):
         if self.num_workers < 1 or self.num_workers >= cpu_count():

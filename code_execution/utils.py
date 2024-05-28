@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 def _batched_wrapper(batch, processor, proc_returns_list):
+    """Wrapper for batched processing."""
     out = []
     for example in batch:
         idx = example["idx"]
@@ -30,6 +31,7 @@ def _batched_wrapper(batch, processor, proc_returns_list):
 
 
 def _normal_wrapper(arg_dict, processor, proc_returns_list):
+    """Wrapper for normal processing."""
     result = processor(*arg_dict["args"])
     if proc_returns_list:
         return [((arg_dict["idx"], i), r) for i, r in enumerate(result)]
@@ -40,7 +42,8 @@ def wrap_processor(
     processor_fn: Callable,
     batch_size: int,
     returns_list: bool,
-):
+) -> Callable:
+    """Wraps a processor function to handle batching."""
     if batch_size > 1:
         wrapper = _batched_wrapper
     else:
@@ -51,6 +54,7 @@ def wrap_processor(
 
 
 def get_pred_dir(idx: int, parent: Path):
+    """Gets the prediction directory for a prediction."""
     return parent.joinpath(f"pred{idx}")
 
 
@@ -114,6 +118,19 @@ def get_results_from_generator(
     garbage_collect_freq: int,
     log_freq: int,
 ):
+    """Gets the results from a generator.
+
+    Args:
+        generator (Generator): The generator to get results from.
+        total (int): The total number of items in the generator.
+        target_returns_multiple (bool): If the target returns multiple items per iteration.
+        disable_tqdm (bool): Whether to disable the progress bar.
+        garbage_collect_freq (int): How often to perform garbage collection.
+        log_freq (int): How often to log if not using tqdm.
+
+    Returns:
+        List: The results from the generator.
+    """
     results = []
 
     # Create a counter for completed since the size of results will not

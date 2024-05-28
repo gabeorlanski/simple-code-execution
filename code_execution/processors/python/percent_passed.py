@@ -136,6 +136,18 @@ def preprocess(
     tc_timeout: Optional[int] = None,
     format_timeout: float = 2,
 ) -> Tuple[str, str, str]:
+    """Preprocess the prediction for a percent passed execution.
+
+    Args:
+        entry_point (str): The entry point of the function to use.
+        test_cases (Union[Tuple[str, str, bool], str, List[ast.AST]]): The test cases to use.
+        tc_imports (Optional[str], optional): The imports for the test cases. Defaults to None.
+        tc_timeout (Optional[int], optional): The timeout for each individual test case. Defaults to None.
+        format_timeout (float, optional): The timeout for formatting. Defaults to 2.
+
+    Returns:
+        Tuple[str, str, str]: Imports, context, and the call code.
+    """
     imports = DEFAULT_IMPORTS
     if tc_imports is not None:
         imports += "\n"
@@ -176,6 +188,19 @@ def postprocess(
     allow_unknown_tests: bool = False,
     expecting_memory: bool = True,
 ) -> Tuple[PredictionOutcome, ParsedTestResults, int, float]:
+    """Postprocesses the result of a percent passed execution.
+
+    Args:
+        result (CommandResult): The execution result for the percent passed.
+        expected_test_cases (Set[str]): The set of indices of expected test cases.
+        allow_duplicates (bool, optional): Allow execution to return multiple results for single test cases. Defaults to False.
+        allow_unknown_tests (bool, optional): Allow results to have tests not in expected. Defaults to False.
+        expecting_memory (bool, optional): Should the postprocessor expect to find memory usage information. Defaults to True.
+
+    Returns:
+        Tuple[PredictionOutcome, ParsedTestResults, int, float]:
+            The outcome of the prediction, the parsed test results, the memory used, and the runtime.
+    """
     parsed_test_cases = parse_tc_stdout(
         result.stdout, expected_test_cases=expected_test_cases
     )

@@ -5,6 +5,7 @@ from code_execution.code_trees import convert_test_list_to_assert
 from code_execution.code_trees import get_global_imports
 from code_execution.code_trees import is_simple_test_case
 from code_execution.code_trees import is_valid_python
+from code_execution.code_trees import remove_deep_trees
 from code_execution.code_trees import safe_ast_parse
 from code_execution.code_trees import wrap_assert_in_try_print
 from code_execution.configs import ExecutionConfig

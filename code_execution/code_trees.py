@@ -1,8 +1,10 @@
 import ast
+import functools
 import logging
 from typing import Callable, List, Tuple, Union
 
 from .utils import ContextTimeLimitException
+from .utils import run_in_parallel
 from .utils import time_limit
 
 logger = logging.getLogger(__name__)
@@ -41,7 +43,7 @@ def is_simple_test_case(tree):
 
 
 def get_global_imports(tree: ast.Module) -> List[str]:
-    """ Get the global imports from an ast tree as a list of strings."""
+    """Get the global imports from an ast tree as a list of strings."""
     out = []
     for node in tree.body:
         if isinstance(node, ast.Import):
@@ -105,17 +107,19 @@ def convert_call_to_assert(
 
 
 def convert_test_list_to_assert(
-    test_list: List[Union[Tuple[str,str,bool],str]], timeout: float = -1.0, convert_to_string: bool = False
+    test_list: List[Union[Tuple[str, str, bool], str]],
+    timeout: float = -1.0,
+    convert_to_string: bool = False,
 ) -> List[Union[ast.AST, str]]:
-    """ Converts a list of test cases to assertion nodes.
-    
+    """Converts a list of test cases to assertion nodes.
+
     Args:
         test_list: A list of test cases. Each test case can be a string or a tuple
             of (call, output, requires_float). If the test case is a string, it will
             be parsed as a call. If it is a tuple, it will be converted to an assertion.
         timeout: The timeout for parsing the test cases.
         convert_to_string: Whether to convert the resulting AST to a string.
-    
+
     Returns:
         A list of converted test cases as AST nodes or strings.
     """
@@ -193,3 +197,68 @@ def wrap_assert_in_try_print(
     template_tree = ast.parse(template).body[0]
     template_tree.body = tree.body + template_tree.body
     return ast.unparse(ast.fix_missing_locations(template_tree))
+
+
+def remove_deep_trees(code_lines: List[str], timeout: float):
+    out = []
+    for code in code_lines:
+        try:
+            with time_limit(timeout):
+                tree = ast.parse(code)
+                if tree is not None:
+                    _ = [n for n in ast.walk(tree)]
+        except (
+            ContextTimeLimitException,
+            RecursionError,
+            SyntaxError,
+            MemoryError,
+        ):
+            tree = None
+        if tree is not None:
+            out.append(code)
+    return out
+
+
+def _remove_deep_trees_worker(batch, timeout):
+    out = []
+    for line in batch:
+        out.append(
+            {
+                "idx": line["idx"],
+                "code": remove_deep_trees(line["code"], timeout=timeout),
+            }
+        )
+    return out
+
+
+def remove_trees_from_lists(
+    codes: List[List[str]],
+    timeout=2,
+    num_workers=4,
+    batch_size=100,
+    **parallel_kwargs,
+) -> List[List[str]]:
+    """Removes deep trees from the code."""
+    batches = []
+    codes = [{"idx": i, "code": c} for i, c in enumerate(codes)]
+    for i in range(0, len(codes), batch_size):
+        batches.append(codes[i : i + batch_size])
+
+    codes = run_in_parallel(
+        functools.partial(_remove_deep_trees_worker, timeout=timeout),
+        args=batches,
+        num_workers=num_workers,
+        **parallel_kwargs,
+    )
+
+    # Unbatch the results.
+    codes = [c for b in codes for c in b]
+
+    # Sort the codes back into the original order
+    return [
+        b["code"]
+        for b in sorted(
+            codes,
+            key=lambda x: x["idx"],
+        )
+    ]

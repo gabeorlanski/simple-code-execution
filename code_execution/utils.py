@@ -187,7 +187,10 @@ def run_in_parallel(
     Returns:
         List: The results of `target(a)` for each `a` in `args`.
     """
-    logger.debug("Starting run_in_parallel for %s", desc or target.__name__)
+    logger.debug(
+        "Starting run_in_parallel for %s",
+        desc or getattr(target, "__name__", "Target"),
+    )
 
     generator_creator = functools.partial(
         tqdm, total=len(args), desc=desc, disable=disable_tqdm

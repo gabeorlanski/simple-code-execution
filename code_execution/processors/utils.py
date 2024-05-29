@@ -24,7 +24,7 @@ FAIL_STR = PredictionOutcome.FAILED.name
 EXCEPTION_STR = "type(e).__name__"
 DEFAULT_TEST_DELIMITER = "___"
 TEST_PRINT_STR = ""
-
+FORMAT_ERROR_MSG = "TEST_FORMAT_ERROR"
 TEST_DELIM_REGEX = re.compile(
     rf"^TEST_(\d+){re.escape(DEFAULT_TEST_DELIMITER)}(.*)"
 )

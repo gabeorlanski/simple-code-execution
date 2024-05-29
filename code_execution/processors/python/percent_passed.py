@@ -9,6 +9,7 @@ from ...execution import CommandResult
 from ...utils import ContextTimeLimitException
 from ...utils import time_limit
 from ..utils import FAIL_STR
+from ..utils import FORMAT_ERROR_MSG
 from ..utils import PASS_STR
 from ..utils import ParsedTestResults
 from ..utils import PredictionOutcome
@@ -134,7 +135,6 @@ def preprocess(
     test_cases: Union[Tuple[str, str, bool], str, List[ast.AST]],
     tc_imports: Optional[str] = None,
     tc_timeout: Optional[int] = None,
-    format_timeout: float = 2,
 ) -> Tuple[str, str, str]:
     """Preprocess the prediction for a percent passed execution.
 
@@ -143,7 +143,6 @@ def preprocess(
         test_cases (Union[Tuple[str, str, bool], str, List[ast.AST]]): The test cases to use.
         tc_imports (Optional[str], optional): The imports for the test cases. Defaults to None.
         tc_timeout (Optional[int], optional): The timeout for each individual test case. Defaults to None.
-        format_timeout (float, optional): The timeout for formatting. Defaults to 2.
 
     Returns:
         Tuple[str, str, str]: Imports, context, and the call code.
@@ -157,12 +156,7 @@ def preprocess(
 
     tests = []
     for idx, test_case in enumerate(test_cases):
-        try:
-            with time_limit(format_timeout):
-                test_func = _make_test_function(idx, entry_point, test_case)
-        except (ContextTimeLimitException, SyntaxError, RecursionError):
-            continue
-        tests.append(test_func)
+        tests.append(_make_test_function(idx, entry_point, test_case))
     if not tests:
         return "", "", ""
 

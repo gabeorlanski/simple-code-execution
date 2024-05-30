@@ -65,6 +65,7 @@ def write_executables(
     write_rate_limit: int,
     disable_tqdm: bool,
     use_mp: bool = False,
+    quiet: bool = False,
 ):
     """Writes the executables to the disk.
 
@@ -74,6 +75,8 @@ def write_executables(
             the contents.
         write_rate_limit (int): The asynchronous write rate limit.
         disable_tqdm (bool): Disable the progress bars.
+        use_mp (bool, optional): Whether to use multiprocessing. Defaults to False.
+        quiet (bool, optional): Whether to suppress logging. Defaults to False.
 
     Raises:
         ValueError: If the prediction directory does not exist.
@@ -94,6 +97,8 @@ def write_executables(
             num_workers=min(write_rate_limit, 8),
             desc="Writing Executables",
             target_returns_multiple=True,
+            quiet=quiet,
+            disable_tqdm=disable_tqdm,
         )
     else:
 
@@ -146,6 +151,7 @@ def cleanup(
     rate_limit: int,
     disable_tqdm: bool,
     use_mp: bool = False,
+    quiet: bool = False,
 ):
     """Cleans up the executables on the disk.
 
@@ -153,7 +159,7 @@ def cleanup(
         files (List[Tuple]): The list of files to clean up.
         rate_limit (int): The rate limit (# threads) for cleaning up the files.
         disable_tqdm (bool): Disable the progress bars.
-
+        quiet (bool, optional): Whether to suppress logging. Defaults to False.
     Raises:
         ValueError: If the prediction directory exists after cleanup.
     """
@@ -169,6 +175,8 @@ def cleanup(
             num_workers=min(rate_limit, 8),
             desc="Cleaning Up",
             target_returns_multiple=True,
+            quiet=quiet,
+            disable_tqdm=disable_tqdm,
         )
     else:
         asyncio.run(

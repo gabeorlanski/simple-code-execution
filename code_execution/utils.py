@@ -141,6 +141,7 @@ def get_results_from_generator(
     disable_tqdm: bool,
     garbage_collect_freq: int,
     log_freq: int,
+    quiet: bool = False,
 ):
     """Gets the results from a generator.
 
@@ -151,6 +152,7 @@ def get_results_from_generator(
         disable_tqdm (bool): Whether to disable the progress bar.
         garbage_collect_freq (int): How often to perform garbage collection.
         log_freq (int): How often to log if not using tqdm.
+        quiet (bool, optional): Whether to suppress logging. Defaults to False.
 
     Returns:
         List: The results from the generator.
@@ -167,7 +169,7 @@ def get_results_from_generator(
         else:
             results.append(r)
         num_completed += 1
-        if disable_tqdm and num_completed % log_freq == 0:
+        if disable_tqdm and num_completed % log_freq == 0 and not quiet:
             write_fn(f"Finished {num_completed}/{total}")
 
         if num_completed % garbage_collect_freq == 0:
@@ -186,6 +188,7 @@ def run_in_parallel(
     chunk_size: int = 1,
     log_freq: int = 500,
     target_returns_multiple: bool = False,
+    quiet: bool = False,
 ) -> List:
     """Runs a function in parallel.
 
@@ -204,6 +207,7 @@ def run_in_parallel(
             to 500.
         target_returns_multiple (bool, optional): If the target returns multiple
             so that `.extend` is used instead of `.append`. Defaults to False.
+        quiet (bool, optional): Whether to suppress logging. Defaults to False.
 
     Returns:
         List: The results of `target(a)` for each `a` in `args`.
@@ -214,7 +218,10 @@ def run_in_parallel(
     )
 
     generator_creator = functools.partial(
-        TQDM_CLASS, total=len(args), desc=desc, disable=disable_tqdm
+        TQDM_CLASS,
+        total=len(args),
+        desc=desc,
+        disable=disable_tqdm or quiet,
     )
 
     num_workers = min(num_workers, len(args))

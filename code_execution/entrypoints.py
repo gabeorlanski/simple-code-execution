@@ -181,6 +181,7 @@ def execute_predictions(
     preproc_returns_list: bool = False,
     preproc_batch_size: int = 1,
     use_mp_for_writing: bool = False,
+    quiet: bool = False,
 ) -> List[Dict]:
     """Executes the program predictions.
 
@@ -195,6 +196,7 @@ def execute_predictions(
         preproc_returns_list (bool, optional): Is the preprocess function one-to-one or one-to-many. Defaults to False.
         preproc_batch_size (int, optional): The batch size for preprocessing. Defaults to 1.
         use_mp_for_writing (bool, optional): Use multiprocessing instead of asyncio for writing files. Defaults to False.
+        quiet (bool, optional): Suppress progress messages for file writing. Defaults to False.
 
     Returns:
         List[Dict]: The executed predictions.
@@ -257,6 +259,7 @@ def execute_predictions(
                 write_rate_limit=config.write_rate_limit,
                 disable_tqdm=config.disable_tqdm,
                 use_mp=use_mp_for_writing,
+                quiet=quiet,
             )
             all_results.extend(execute_commands(commands, config))
 
@@ -267,6 +270,7 @@ def execute_predictions(
                     rate_limit=config.write_rate_limit,
                     disable_tqdm=config.disable_tqdm,
                     use_mp=use_mp_for_writing,
+                    quiet=quiet,
                 )
         all_results = {result[0]: result[1] for result in all_results}
         all_results.update(filtered_results)

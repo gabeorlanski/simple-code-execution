@@ -8,6 +8,7 @@ from typing import Dict, List, Tuple
 
 import aiofiles
 from tqdm.asyncio import tqdm_asyncio
+from code_execution.utils import run_in_parallel
 
 logger = logging.getLogger(__name__)
 
@@ -47,8 +48,23 @@ async def _async_write_executables(
     return out
 
 
+def _write_worker(batch):
+    out = []
+    for idx, files, pred_dir in batch:
+        pred_dir.mkdir(exist_ok=True)
+        for name, contents in files.items():
+            filepath = pred_dir.joinpath(name)
+            with filepath.open("w", encoding="utf-8") as f:
+                f.write(contents)
+        out.append((idx, pred_dir.resolve().absolute()))
+    return out
+
+
 def write_executables(
-    files_to_write: List[Tuple], write_rate_limit: int, disable_tqdm: bool
+    files_to_write: List[Tuple],
+    write_rate_limit: int,
+    disable_tqdm: bool,
+    use_mp: bool = False,
 ):
     """Writes the executables to the disk.
 
@@ -68,13 +84,26 @@ def write_executables(
         len(files_to_write),
         f"{write_rate_limit=}",
     )
-    out_results = asyncio.run(
-        _async_write_executables(
-            files_to_write,
-            rate_limit=write_rate_limit,
-            disable_tqdm=disable_tqdm,
+    if use_mp:
+        out_results = run_in_parallel(
+            _write_worker,
+            [
+                files_to_write[i : i + 100]
+                for i in range(0, len(files_to_write), 100)
+            ],
+            num_workers=min(write_rate_limit, 8),
+            desc="Writing Executables",
+            target_returns_multiple=True,
         )
-    )
+    else:
+
+        out_results = asyncio.run(
+            _async_write_executables(
+                files_to_write,
+                rate_limit=write_rate_limit,
+                disable_tqdm=disable_tqdm,
+            )
+        )
     logger.debug("Ensuring all files written...")
     for idx, r in out_results:
         if not r.exists():
@@ -106,7 +135,18 @@ async def _async_cleanup(
             print(f"Wrote {completed}/{len(pred_list)} predictions")
 
 
-def cleanup(files: List[Tuple], rate_limit: int, disable_tqdm: bool):
+def _cleanup_worker(batch):
+    for *_, d in batch:
+        shutil.rmtree(d)
+    return [1 for _ in batch]
+
+
+def cleanup(
+    files: List[Tuple],
+    rate_limit: int,
+    disable_tqdm: bool,
+    use_mp: bool = False,
+):
     """Cleans up the executables on the disk.
 
     Args:
@@ -122,13 +162,22 @@ def cleanup(files: List[Tuple], rate_limit: int, disable_tqdm: bool):
         len(files),
         rate_limit,
     )
-    asyncio.run(
-        _async_cleanup(
-            files,
-            rate_limit=rate_limit,
-            disable_tqdm=disable_tqdm,
+    if use_mp:
+        _ = run_in_parallel(
+            _cleanup_worker,
+            [files[i : i + 100] for i in range(0, len(files), 100)],
+            num_workers=min(rate_limit, 8),
+            desc="Cleaning Up",
+            target_returns_multiple=True,
         )
-    )
+    else:
+        asyncio.run(
+            _async_cleanup(
+                files,
+                rate_limit=rate_limit,
+                disable_tqdm=disable_tqdm,
+            )
+        )
 
     logger.debug("Ensuring all files cleaned up...")
     for *_, d in files:

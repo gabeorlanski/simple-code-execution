@@ -232,12 +232,16 @@ def execution_entrypoint_fixture(passing_program):
 @pytest.mark.parametrize(
     "max_at_once", [1, 2, -1], ids=["single", "double", "all"]
 )
+@pytest.mark.parametrize(
+    "use_mp", [True, False], ids=["multiprocessing", "async"]
+)
 def test_execute_predictions(
     execution_config,
     execution_entrypoint_fixture,
     tmpdir,
     passing_program,
     max_at_once,
+    use_mp,
 ):
     cwd = Path(tmpdir)
     execution_config.max_execute_at_once = max_at_once
@@ -247,6 +251,7 @@ def test_execute_predictions(
         preprocessor=_preprocessor,
         postprocessor=_postprocessor,
         debug_dir=cwd,
+        use_mp_for_writing=use_mp,
     )
 
     assert len(results) == len(execution_entrypoint_fixture)

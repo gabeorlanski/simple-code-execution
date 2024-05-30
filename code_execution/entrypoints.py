@@ -18,7 +18,8 @@ from code_execution.processors.utils import PredictionOutcome
 from code_execution.utils import Executable
 from code_execution.utils import get_pred_dir
 from code_execution.utils import run_in_parallel
-from code_execution.utils import wrap_processor, wrap_pbar
+from code_execution.utils import wrap_pbar
+from code_execution.utils import wrap_processor
 
 logger = logging.getLogger(__name__)
 

@@ -1,6 +1,8 @@
-import pytest
-from code_execution import code_trees
 from copy import deepcopy
+
+import pytest
+
+from code_execution import code_trees
 
 
 def test_remove_deep_code():

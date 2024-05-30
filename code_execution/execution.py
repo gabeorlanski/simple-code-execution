@@ -14,7 +14,8 @@ import numpy as np
 import psutil
 
 from .configs import ExecutionConfig
-from .utils import get_results_from_generator, wrap_pbar
+from .utils import get_results_from_generator
+from .utils import wrap_pbar
 
 LOGGING_IS_CONFIGURED = logging.getLogger().hasHandlers()
 

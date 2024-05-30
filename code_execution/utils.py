@@ -10,9 +10,9 @@ from dataclasses import field
 from pathlib import Path
 from typing import Callable, Dict, Generator, List, Optional, Tuple
 
-
-from tqdm.notebook import tqdm as tqdm_notebook
 from tqdm import tqdm as tqdm_normal
+from tqdm.notebook import tqdm as tqdm_notebook
+
 from code_execution import utility_modules
 
 LOGGING_IS_CONFIGURED = logging.getLogger().hasHandlers()

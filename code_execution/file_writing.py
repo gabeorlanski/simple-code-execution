@@ -68,8 +68,7 @@ def write_executables(
         len(files_to_write),
         f"{write_rate_limit=}",
     )
-    loop = asyncio.get_event_loop()
-    out_results = loop.run_until_complete(
+    out_results = asyncio.run(
         _async_write_executables(
             files_to_write,
             rate_limit=write_rate_limit,
@@ -123,8 +122,7 @@ def cleanup(files: List[Tuple], rate_limit: int, disable_tqdm: bool):
         len(files),
         rate_limit,
     )
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(
+    asyncio.run(
         _async_cleanup(
             files,
             rate_limit=rate_limit,

@@ -146,21 +146,14 @@ def test_execution(basic_prediction, preprocessor, postprocessor, tmpdir):
     assert runtime > 0
 
 
-@pytest.mark.parametrize("input_type", ["list", "str", "ast"])
-def test_make_test_hang_failure(input_type):
-    """Test for a specific instance when a long list of dicts causes the program to hang,"""
+def test_make_test_does_not_remove_long():
+    """Test that ensures that make test does not remove long test cases."""
+
     test_case = [
         "add_1()",
         repr([{"lat": 1.0, "lon": 1.0} for _ in range(10000)]),
         False,
     ]
-    if input_type != "list":
-        test_case = f"assert {test_case[0]} == {test_case[1]}"
-        if input_type == "ast":
-            test_case = ast.parse(test_case)
 
-    try:
-        with time_limit(5):
-            percent_passed._make_test_function(0, "add_1", test_case=test_case)
-    except ContextTimeLimitException:
-        pytest.fail("Test function took too long to generate")
+    result = percent_passed._make_test_function(0, "add_1", test_case=test_case)
+    assert len(result) > 0

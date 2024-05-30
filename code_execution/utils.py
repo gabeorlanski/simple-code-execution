@@ -10,14 +10,35 @@ from dataclasses import field
 from pathlib import Path
 from typing import Callable, Dict, Generator, List, Optional, Tuple
 
-from tqdm import tqdm
 
+from tqdm.notebook import tqdm as tqdm_notebook
+from tqdm import tqdm as tqdm_normal
 from code_execution import utility_modules
 
 LOGGING_IS_CONFIGURED = logging.getLogger().hasHandlers()
 
 
 logger = logging.getLogger(__name__)
+
+
+def in_notebook():
+    try:
+        from IPython import get_ipython
+
+        if "IPKernelApp" not in get_ipython().config:  # pragma: no cover
+            return False
+    except ImportError:
+        return False
+    except AttributeError:
+        return False
+    return True
+
+
+TQDM_CLASS = tqdm_notebook if in_notebook() else tqdm_normal
+
+
+def wrap_pbar(iterable, **kwargs):
+    return TQDM_CLASS(iterable, **kwargs)
 
 
 def _batched_wrapper(batch, processor, proc_returns_list):
@@ -193,7 +214,7 @@ def run_in_parallel(
     )
 
     generator_creator = functools.partial(
-        tqdm, total=len(args), desc=desc, disable=disable_tqdm
+        TQDM_CLASS, total=len(args), desc=desc, disable=disable_tqdm
     )
 
     num_workers = min(num_workers, len(args))

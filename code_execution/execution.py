@@ -12,10 +12,9 @@ from typing import Dict, List, Tuple
 
 import numpy as np
 import psutil
-from tqdm import tqdm
 
 from .configs import ExecutionConfig
-from .utils import get_results_from_generator
+from .utils import get_results_from_generator, wrap_pbar
 
 LOGGING_IS_CONFIGURED = logging.getLogger().hasHandlers()
 
@@ -440,7 +439,7 @@ def execute_commands(
         )
     else:
         logger.debug("Running in serial as num_workers=1")
-        pbar_generator = tqdm(
+        pbar_generator = wrap_pbar(
             map(executor_fn, to_run),
             total=len(to_run),
             desc="Executing Predictions",

@@ -1,5 +1,6 @@
 import pytest
 from code_execution import code_trees
+from copy import deepcopy
 
 
 def test_remove_deep_code():
@@ -38,5 +39,5 @@ def test_remove_deep_code():
         ],
     ]
 
-    res = code_trees.remove_trees_from_lists(code_lines, timeout=0.1)
+    res = code_trees.remove_trees_from_lists(deepcopy(code_lines), timeout=0.1)
     assert res == [c[1:] for c in code_lines]

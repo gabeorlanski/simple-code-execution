@@ -396,7 +396,7 @@ def _parallel_execute_code(
         pool.close()
         pool.terminate()
 
-    logger.info(
+    progress_writer(
         f"Finished executing {len(results):,} in {seconds_to_human(time.time() - start_time)}"
     )
 

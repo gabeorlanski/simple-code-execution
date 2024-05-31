@@ -413,7 +413,7 @@ def execute_commands(
 ) -> List[ExecutionResult]:
     """Executes a list of commands."""
     if not LOGGING_IS_CONFIGURED:
-        print(f"Executing {len(predictions):,} predictions" % len(predictions))
+        print(f"Executing {len(predictions):,} predictions")
     else:
         logger.debug("Executing %d predictions", len(predictions))
     if config.batched:

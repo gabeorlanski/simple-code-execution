@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 async def _async_write_executables(
     pred_list: List[Dict],
     rate_limit: int,
-    disable_tqdm: bool,
+    enable_tqdm: bool,
 ):
     """Writes the executables to the disk asynchronously."""
     sem = asyncio.Semaphore(rate_limit)
@@ -34,16 +34,17 @@ async def _async_write_executables(
             return idx, pred_dir.resolve().absolute()
 
     tasks = [write_pred(*p) for p in pred_list]
-    if disable_tqdm:
-        gen = asyncio.as_completed(tasks)
-    else:
+    if enable_tqdm:
         gen = tqdm_asyncio.as_completed(tasks, desc="Writing Executables")
+    else:
+
+        gen = asyncio.as_completed(tasks)
     out = []
     for result in gen:
         res = await result
         out.append(res)
-        if disable_tqdm and len(out) % 500 == 0:
-            print(f"Wrote {len(out)}/{len(pred_list)} predictions")
+        if len(out) % 50_000 == 0:
+            logger.debug(f"Wrote {len(out)}/{len(pred_list)} predictions")
 
     return out
 
@@ -63,9 +64,8 @@ def _write_worker(batch):
 def write_executables(
     files_to_write: List[Tuple],
     write_rate_limit: int,
-    disable_tqdm: bool,
     use_mp: bool = False,
-    quiet: bool = False,
+    enable_tqdm: bool = False,
 ):
     """Writes the executables to the disk.
 
@@ -74,9 +74,8 @@ def write_executables(
             dict where the key is a absolute path to the file and the value is
             the contents.
         write_rate_limit (int): The asynchronous write rate limit.
-        disable_tqdm (bool): Disable the progress bars.
         use_mp (bool, optional): Whether to use multiprocessing. Defaults to False.
-        quiet (bool, optional): Whether to suppress logging. Defaults to False.
+        enable_tqdm (bool, optional): Whether to enable the progress bars. Defaults to False.
 
     Raises:
         ValueError: If the prediction directory does not exist.
@@ -97,8 +96,7 @@ def write_executables(
             num_workers=min(write_rate_limit, 8),
             desc="Writing Executables",
             target_returns_multiple=True,
-            quiet=quiet,
-            disable_tqdm=disable_tqdm,
+            disable_tqdm=not enable_tqdm,
         )
     else:
 
@@ -106,7 +104,7 @@ def write_executables(
             _async_write_executables(
                 files_to_write,
                 rate_limit=write_rate_limit,
-                disable_tqdm=disable_tqdm,
+                enable_tqdm=enable_tqdm,
             )
         )
     logger.debug("Ensuring all files written...")
@@ -118,7 +116,7 @@ def write_executables(
 async def _async_cleanup(
     pred_list: List[Tuple],
     rate_limit: int,
-    disable_tqdm: bool,
+    enable_tqdm: bool = False,
 ):
     """Cleans up the executables on the disk asynchronously."""
     sem = asyncio.Semaphore(rate_limit)
@@ -128,7 +126,7 @@ async def _async_cleanup(
             shutil.rmtree(pred_dir)
 
     tasks = [cleanup_dir(p[-1]) for p in pred_list]
-    if disable_tqdm:
+    if not enable_tqdm:
         gen = asyncio.as_completed(tasks)
     else:
         gen = tqdm_asyncio.as_completed(tasks, desc="Cleaning Up")
@@ -136,8 +134,8 @@ async def _async_cleanup(
     for result in gen:
         _ = await result
         completed += 1
-        if disable_tqdm and completed % 500 == 0:
-            print(f"Wrote {completed}/{len(pred_list)} predictions")
+        if completed % 25_000 == 0:
+            logger.debug(f"Wrote {completed}/{len(pred_list)} predictions")
 
 
 def _cleanup_worker(batch):
@@ -149,9 +147,8 @@ def _cleanup_worker(batch):
 def cleanup(
     files: List[Tuple],
     rate_limit: int,
-    disable_tqdm: bool,
     use_mp: bool = False,
-    quiet: bool = False,
+    enable_tqdm: bool = False,
 ):
     """Cleans up the executables on the disk.
 
@@ -175,15 +172,14 @@ def cleanup(
             num_workers=min(rate_limit, 8),
             desc="Cleaning Up",
             target_returns_multiple=True,
-            quiet=quiet,
-            disable_tqdm=disable_tqdm,
+            disable_tqdm=not enable_tqdm,
         )
     else:
         asyncio.run(
             _async_cleanup(
                 files,
                 rate_limit=rate_limit,
-                disable_tqdm=disable_tqdm,
+                enable_tqdm=enable_tqdm,
             )
         )
 

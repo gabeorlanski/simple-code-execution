@@ -412,8 +412,10 @@ def execute_commands(
     config: ExecutionConfig,
 ) -> List[ExecutionResult]:
     """Executes a list of commands."""
-    logger.debug("Executing %d predictions", len(predictions))
-
+    if not LOGGING_IS_CONFIGURED:
+        print(f"Executing {len(predictions):,} predictions" % len(predictions))
+    else:
+        logger.debug("Executing %d predictions", len(predictions))
     if config.batched:
         logger.debug(
             "Running in batched mode with batch_size=%d", config.batch_size
@@ -450,7 +452,6 @@ def execute_commands(
             generator=pbar_generator,
             total=len(to_run),
             target_returns_multiple=config.batched,
-            disable_tqdm=config.disable_tqdm,
             garbage_collect_freq=500,
             log_freq=500,
         )

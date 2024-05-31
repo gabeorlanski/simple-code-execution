@@ -257,9 +257,8 @@ def execute_predictions(
             write_executables(
                 files_to_write=files,
                 write_rate_limit=config.write_rate_limit,
-                disable_tqdm=config.disable_tqdm,
                 use_mp=use_mp_for_writing,
-                quiet=quiet,
+                enable_tqdm=config.display_write_progress,
             )
             all_results.extend(execute_commands(commands, config))
 
@@ -268,9 +267,8 @@ def execute_predictions(
                 cleanup(
                     files,
                     rate_limit=config.write_rate_limit,
-                    disable_tqdm=config.disable_tqdm,
+                    enable_tqdm=config.display_write_progress,
                     use_mp=use_mp_for_writing,
-                    quiet=quiet,
                 )
         all_results = {result[0]: result[1] for result in all_results}
         all_results.update(filtered_results)

@@ -22,6 +22,7 @@ class ExecutionConfig:
         num_executors: The number of executor processes running.
         log_freq: How often to log progress.
         buffer_size: Chunk size to use for execution.
+        display_write_progress: Display progress bars for writing and cleaning up.
     """
 
     num_workers: int
@@ -35,6 +36,7 @@ class ExecutionConfig:
     num_executors: int = 4
     log_freq: int = 1000
     buffer_size: int = 100
+    display_write_progress: bool = False
 
     def __post_init__(self):
         if self.num_workers < 1 or self.num_workers >= cpu_count():

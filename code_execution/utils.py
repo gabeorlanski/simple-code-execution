@@ -138,10 +138,8 @@ def get_results_from_generator(
     generator: Generator,
     total: int,
     target_returns_multiple: bool,
-    disable_tqdm: bool,
     garbage_collect_freq: int,
     log_freq: int,
-    quiet: bool = False,
 ):
     """Gets the results from a generator.
 
@@ -161,7 +159,6 @@ def get_results_from_generator(
 
     # Create a counter for completed since the size of results will not
     # always go up by one.
-    write_fn = logger.info if LOGGING_IS_CONFIGURED else logger.debug
     num_completed = 0
     for r in generator:
         if target_returns_multiple:
@@ -169,8 +166,8 @@ def get_results_from_generator(
         else:
             results.append(r)
         num_completed += 1
-        if disable_tqdm and num_completed % log_freq == 0 and not quiet:
-            write_fn(f"Finished {num_completed}/{total}")
+        if num_completed % log_freq == 0:
+            logger.debug(f"Finished {num_completed}/{total}")
 
         if num_completed % garbage_collect_freq == 0:
             gc.collect()
@@ -188,7 +185,6 @@ def run_in_parallel(
     chunk_size: int = 1,
     log_freq: int = 500,
     target_returns_multiple: bool = False,
-    quiet: bool = False,
 ) -> List:
     """Runs a function in parallel.
 
@@ -221,7 +217,7 @@ def run_in_parallel(
         TQDM_CLASS,
         total=len(args),
         desc=desc,
-        disable=disable_tqdm or quiet,
+        disable=disable_tqdm,
     )
 
     num_workers = min(num_workers, len(args))
@@ -244,7 +240,6 @@ def run_in_parallel(
                 generator=pbar_generator,
                 total=len(args),
                 target_returns_multiple=target_returns_multiple,
-                disable_tqdm=disable_tqdm,
                 garbage_collect_freq=garbage_collect_freq,
                 log_freq=log_freq,
             )
@@ -258,7 +253,6 @@ def run_in_parallel(
             generator=pbar_generator,
             total=len(args),
             target_returns_multiple=target_returns_multiple,
-            disable_tqdm=disable_tqdm,
             garbage_collect_freq=garbage_collect_freq,
             log_freq=log_freq,
         )

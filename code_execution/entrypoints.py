@@ -7,6 +7,8 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple, Union
 
+from tqdm import tqdm
+
 from code_execution.configs import ExecutionConfig
 from code_execution.execution import CommandResult
 from code_execution.execution import ExecutionResult
@@ -18,7 +20,6 @@ from code_execution.processors.utils import PredictionOutcome
 from code_execution.utils import Executable
 from code_execution.utils import get_pred_dir
 from code_execution.utils import run_in_parallel
-from code_execution.utils import wrap_pbar
 from code_execution.utils import wrap_processor
 
 logger = logging.getLogger(__name__)
@@ -161,7 +162,7 @@ def postprocess_commands(
         results = new_results
 
     out = []
-    for key, result in wrap_pbar(
+    for key, result in tqdm(
         sorted(results.items(), key=lambda x: x[0]),
         desc="Postprocessing",
         total=len(results),

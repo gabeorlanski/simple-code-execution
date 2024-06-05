@@ -10,8 +10,7 @@ from dataclasses import field
 from pathlib import Path
 from typing import Callable, Dict, Generator, List, Optional, Tuple
 
-from tqdm import tqdm as tqdm_normal
-from tqdm.notebook import tqdm as tqdm_notebook
+from tqdm import tqdm
 
 from code_execution import utility_modules
 
@@ -32,13 +31,6 @@ def in_notebook():
     except AttributeError:
         return False
     return True
-
-
-TQDM_CLASS = tqdm_notebook if in_notebook() else tqdm_normal
-
-
-def wrap_pbar(iterable, **kwargs):
-    return TQDM_CLASS(iterable, **kwargs)
 
 
 def _batched_wrapper(batch, processor, proc_returns_list):
@@ -214,7 +206,7 @@ def run_in_parallel(
     )
 
     generator_creator = functools.partial(
-        TQDM_CLASS,
+        tqdm,
         total=len(args),
         desc=desc,
         disable=disable_tqdm,

@@ -107,6 +107,15 @@ class ParsedTestResults:
         )
         return num_error / self.num_expected_tests
 
+    @property
+    def errored_tests(self) -> Dict[str, str]:
+        """Gets the tests that errored."""
+        return {
+            k: v
+            for k, v in self.test_results.items()
+            if v not in {PASS_STR, FAIL_STR}
+        }
+
 
 def _default_did_test_pass(result: str, *_) -> bool:
     return result == PASS_STR

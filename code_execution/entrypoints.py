@@ -303,10 +303,12 @@ def execute_predictions(
         all_results = {result[0]: result[1] for result in all_results}
         all_results.update(filtered_results)
         return postprocess_commands(
-            pred_list,
-            all_results,
-            postprocessor,
+            raw_preds=pred_list,
+            results=all_results,
+            postprocessor=postprocessor,
             returned_multiple=preproc_returns_list,
+            disable_tqdm=config.disable_tqdm,
+            log_freq=config.log_freq,
         )
 
     if debug_dir is None:

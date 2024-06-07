@@ -1,3 +1,5 @@
+""" Utility functions for code execution. """
+
 import contextlib
 import functools
 import gc
@@ -21,7 +23,10 @@ logger = logging.getLogger(__name__)
 
 
 def in_notebook():
+    """Checks if the code is running in a notebook."""
     try:
+        # pylint: disable=import-outside-toplevel
+        # pylint: disable=import-error
         from IPython import get_ipython
 
         if "IPKernelApp" not in get_ipython().config:  # pragma: no cover

@@ -1,13 +1,14 @@
+""" Module for executing code. """
+
 import concurrent.futures
 import dataclasses
 import functools
-import gc
 import logging
 import multiprocessing as mp
 import pathlib
-import queue
 import subprocess
 import time
+from datetime import datetime
 from typing import Dict, List, Tuple
 
 import numpy as np
@@ -109,7 +110,9 @@ class ExecutionResult:
         stderr: str = "Invalid",
         elapsed: float = 10.0,
     ) -> "ExecutionResult":
-        """Creates a dummy ExecutionResult that represents an invalid result. Useful for when your preprocessor finds a program you want to skip execution for."""
+        """Creates a dummy ExecutionResult that represents an invalid result.
+        Useful for when your preprocessor finds a program you want to skip
+        execution for."""
         return cls(
             command_results=[
                 CommandResult(
@@ -190,7 +193,8 @@ def safe_execute(
       command_to_run: The command to run.
       working_dir: The working directory to run them in.
       timeout Timeout.
-      num_times: Number of times to execute the command. Useful for getting runtime and memory means.
+      num_times: Number of times to execute the command. Useful for getting
+        runtime and memory means.
     Returns:
       The result of executing the command.
     """
@@ -262,12 +266,14 @@ def serial_execute_code(sample: Dict) -> ExecutionResult:
 
 
 def execute_single(execution_dict: Dict) -> Tuple[Tuple, ExecutionResult]:
+    """Executes a single program."""
     key = execution_dict["key"]
     executable = execution_dict["executable"]
     return key, serial_execute_code(executable)
 
 
 def batched_execute_code(to_run: List[Dict]) -> List[Dict]:
+    """Executes a batch of commands."""
     results = [None] * len(to_run)
     for i, command in enumerate(to_run):
         results[i] = execute_single(command)
@@ -275,6 +281,7 @@ def batched_execute_code(to_run: List[Dict]) -> List[Dict]:
 
 
 def sizeof_fmt(num, suffix="B"):
+    """Human readable file size."""
     for unit in ("", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi"):
         if abs(num) < 1024.0:
             return f"{num:3.1f}{unit}{suffix}"
@@ -285,6 +292,7 @@ def sizeof_fmt(num, suffix="B"):
 def threaded_execution(
     to_run, execution_fn, max_threads, is_batched: bool = False
 ):
+    """Executes a list of commands in parallel."""
     num_threads = min(len(to_run), max_threads)
     out = []
     if max_threads > 1:
@@ -362,7 +370,11 @@ def _parallel_execute_code(
         is_batched=is_batched,
     )
 
-    progress_writer = logger.info if LOGGING_IS_CONFIGURED else print
+    progress_writer = (
+        logger.info
+        if LOGGING_IS_CONFIGURED
+        else lambda m: print(f"{datetime.now().isoformat(' ','seconds')} {m}")
+    )
 
     last_log = 0
     with mp.Pool(processes=num_executors) as pool:
@@ -379,8 +391,9 @@ def _parallel_execute_code(
                 eta = seconds_to_human((total_commands - len(results)) / rate)
                 interval_received = len(results)
                 rate_str = f"{rate:0.2f} P/S"
+                prog_str = f"{prog:0.2%}"
                 progress_writer(
-                    f"{len(results):>9,}/{total_commands:<9,}({prog:0.2%}) @ {rate_str:<12}"
+                    f"{len(results):>9,}/{total_commands:<9,}({prog_str:>6}) @ {rate_str:<12}"
                     f" in {seconds_to_human(elapsed)} ETA: {eta}"
                 )
                 one_min_cpu, _, fifteen_min_cpu = [

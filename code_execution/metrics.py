@@ -1,3 +1,5 @@
+""" Metrics for evaluating the performance of the code execution. """
+
 import ast
 import logging
 from collections import Counter
@@ -28,6 +30,7 @@ def pass_at_k(n, c, k):
 
 
 def calc_question_metric(question_predictions):
+    """Calculate question metrics from the predictions."""
     # The naming may not be optimal, but the difference is that one is for the
     # question as a whole (i.e. was the question solved). The other dict is for
     # metrics that describe the individual predictions for the question (i.e.
@@ -44,10 +47,10 @@ def calc_question_metric(question_predictions):
     # Used for sanity check
     num_test_cases = set()
 
-    was_qustion_solved = False
+    was_question_solved = False
     for pred in question_predictions:
         if pred["passed"]:
-            was_qustion_solved = True
+            was_question_solved = True
         question_stats["num_passed"] += pred["passed"]
         code = pred["solution"].strip()
         tree = safe_ast_parse(code)
@@ -64,4 +67,4 @@ def calc_question_metric(question_predictions):
         logger.error(question_predictions)
         raise ValueError("Different number of tests.")
     pred_stats["num_lines"] = np.mean(pred_stats["num_lines"])
-    return was_qustion_solved, question_stats, pred_stats
+    return was_question_solved, question_stats, pred_stats

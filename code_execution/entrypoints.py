@@ -1,11 +1,12 @@
-import functools
+""" Module for entrypoints for code execution. """
+
 import logging
 import os
 import tempfile
 from collections import defaultdict
 from dataclasses import asdict
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Tuple, Union
+from typing import Callable, Dict, List, Tuple, Union
 
 from tqdm import tqdm
 
@@ -68,7 +69,8 @@ def preprocess_commands(
     Returns:
         files_to_write: The files to write to disk.
         commands_to_run: The commands to run.
-        filtered_out: The results that were filtered out during preprocessing, these will be added back after execution.
+        filtered_out: The results that were filtered out during preprocessing,
+            these will be added back after execution.
     """
     logger.debug("Creating Executables")
     executable_creator = wrap_processor(
@@ -141,15 +143,22 @@ def postprocess_commands(
     results: Dict[Tuple[int, int], ExecutionResult],
     postprocessor: Callable[[Dict, ExecutionResult], Dict],
     returned_multiple: bool,
+    disable_tqdm: bool = False,
+    log_freq: int = 1000,
 ) -> List[Dict]:
     """Postprocesses the commands after exeuction.
 
     Args:
-        raw_preds (Dict): The raw predictions before postprocessing, used to add back information.
-        results (Dict[Tuple[int, int], ExecutionResult]): The results of executions where the key is used for ordering and the value is the result post execution.
+        raw_preds (Dict): The raw predictions before postprocessing, used to add
+            back information.
+        results (Dict[Tuple[int, int], ExecutionResult]): The results of
+            executions where the key is used for ordering and the value is the
+            result post execution.
         postprocessor (Callable): The postprocessor function to use.
-        returned_multiple (bool): Whether the preprocessor returned multiple results per prediction.
-
+        returned_multiple (bool): Whether the preprocessor returned multiple
+            results per prediction.
+        disable_tqdm (bool, optional): Whether to disable tqdm. Defaults to False.
+        log_freq (int, optional): How often to log. Defaults to 1000.
     Returns:
         List[Dict]: The postprocessed results.
     """
@@ -162,14 +171,28 @@ def postprocess_commands(
         results = new_results
 
     out = []
-    for key, result in tqdm(
-        sorted(results.items(), key=lambda x: x[0]),
-        desc="Postprocessing",
-        total=len(results),
-    ):
+    if disable_tqdm:
+        prog_level = logging.INFO
+        res_generator = sorted(results.items(), key=lambda x: x[0])
+    else:
+        prog_level = logging.DEBUG
+        res_generator = tqdm(
+            sorted(results.items(), key=lambda x: x[0]),
+            desc="Postprocessing",
+            total=len(results),
+            mininterval=log_freq,
+        )
+
+    for key, result in res_generator:
+
         prediction = raw_preds[key[0]]
         processed = postprocessor(prediction, result)
         out.append(processed)
+        if len(out) % log_freq == 0:
+            logger.log(
+                prog_level,
+                f"Processed {len(out):,}/{len(results):,} predictions",
+            )
     return out
 
 
@@ -182,22 +205,27 @@ def execute_predictions(
     preproc_returns_list: bool = False,
     preproc_batch_size: int = 1,
     use_mp_for_writing: bool = False,
-    quiet: bool = False,
 ) -> List[Dict]:
     """Executes the program predictions.
 
-    First preprocesses the commands to run, writes them to disk, then executes them, and finally postprocesses the results.
+    First preprocesses the commands to run, writes them to disk, then executes
+    them, and finally postprocesses the results.
 
     Args:
         config (ExecutionConfig): The config for execution.
         pred_list (List[Dict]): The list of predictions to execute.
-        preprocessor (Callable[[Dict], Union[Executable, List[Executable]]]): The preprocessor function to use to create the files and commands to execute.
-        postprocessor (Callable[[Dict, Dict], Dict], optional): _description_. Defaults to None.
-        debug_dir (Path, optional): The directory to use if you want to debug. This saves **all** files here and does not clean them up. Defaults to None.
-        preproc_returns_list (bool, optional): Is the preprocess function one-to-one or one-to-many. Defaults to False.
+        preprocessor (Callable[[Dict], Union[Executable, List[Executable]]]): The preprocessor
+            function to use to create the files and commands to execute.
+        postprocessor (Callable[[Dict, Dict], Dict], optional): The postprocessor
+            function for taking the results and processing them. Defaults to None.
+        debug_dir (Path, optional): The directory to use if you want to debug. This saves
+            **all** files here and does not clean them up. Defaults to None.
+        preproc_returns_list (bool, optional): Is the preprocess function one-to-one
+            or one-to-many. Defaults to False.
         preproc_batch_size (int, optional): The batch size for preprocessing. Defaults to 1.
-        use_mp_for_writing (bool, optional): Use multiprocessing instead of asyncio for writing files. Defaults to False.
-        quiet (bool, optional): Suppress progress messages for file writing. Defaults to False.
+        use_mp_for_writing (bool, optional): Use multiprocessing instead of
+            asyncio for writing files. Defaults to False. Note that this needs to
+            be enabled in notebooks.
 
     Returns:
         List[Dict]: The executed predictions.
@@ -223,7 +251,8 @@ def execute_predictions(
             and len(commands_to_run) > config.max_execute_at_once
         ):
             logger.info(
-                f"Executing {len(commands_to_run):,} commands in chunks of {config.max_execute_at_once:,}"
+                f"Executing {len(commands_to_run):,} commands"
+                f"in chunks of {config.max_execute_at_once:,}"
             )
             if config.max_execute_at_once == 1:
                 logger.warning(

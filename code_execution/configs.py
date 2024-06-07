@@ -11,7 +11,9 @@ class ExecutionConfig:
     Args:
         num_workers: The number of workers to use.
         batch_size: The batch size to use for pre- and post- processing.
-        max_tasks_per_process: The maximum number of tasks to run per process. If not none, the worker will be killed every `max_tasks_per_process` and a new one will be created.
+        max_tasks_per_process: The maximum number of tasks to run per process. If not none,
+            the worker will be killed every `max_tasks_per_process` and a new one
+            will be created.
         write_rate_limit: The rate limit for writing files. By default it is 768.
         chunk_size: The chunk size for parallel execution.
         batch_size: The batch size to use for all parallel operations.
@@ -44,4 +46,5 @@ class ExecutionConfig:
 
     @property
     def batched(self):
+        """Whether to use batched processing."""
         return self.batch_size > 1

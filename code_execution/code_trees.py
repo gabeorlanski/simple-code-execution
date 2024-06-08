@@ -88,7 +88,7 @@ def convert_call_to_assert(
                     left=tree.body[-1].value, op=ast.Sub(), right=out_tree
                 ),
                 ops=[ast.Lt()],
-                comparators=[ast.Constant(value="1e-6", kind=None)],
+                comparators=[ast.Constant(value=1e-6, kind=float)],
             ),
             msg=None,
         )
@@ -199,14 +199,14 @@ def wrap_assert_in_try_print(
     return ast.unparse(ast.fix_missing_locations(template_tree))
 
 
-def remove_deep_trees(code_lines: List[str], timeout: float):
+def remove_deep_trees(
+    code_lines: List[str], tree_process_func: Callable, timeout: float
+):
     out = []
     for code in code_lines:
         try:
             with time_limit(timeout):
-                tree = ast.parse(code)
-                if tree is not None:
-                    _ = [n for n in ast.walk(tree)]
+                tree = tree_process_func(code)
         except (
             ContextTimeLimitException,
             RecursionError,
@@ -219,20 +219,29 @@ def remove_deep_trees(code_lines: List[str], timeout: float):
     return out
 
 
-def _remove_deep_trees_worker(batch, timeout):
+def _remove_deep_trees_worker(batch, tree_process_func, timeout):
     out = []
     for line in batch:
         out.append(
             {
                 "idx": line["idx"],
-                "code": remove_deep_trees(line["code"], timeout=timeout),
+                "code": remove_deep_trees(
+                    line["code"], tree_process_func, timeout=timeout
+                ),
             }
         )
     return out
 
 
+def default_tree_process_func(code: str):
+    tree = ast.parse(code)
+    _ = [n for n in ast.walk(tree)]
+    return tree
+
+
 def remove_trees_from_lists(
-    codes: List[List[str]],
+    codes: List,
+    tree_process_func: Callable = default_tree_process_func,
     timeout=2,
     num_workers=4,
     batch_size=100,
@@ -245,7 +254,11 @@ def remove_trees_from_lists(
         batches.append(codes[i : i + batch_size])
 
     codes = run_in_parallel(
-        functools.partial(_remove_deep_trees_worker, timeout=timeout),
+        functools.partial(
+            _remove_deep_trees_worker,
+            tree_process_func=tree_process_func,
+            timeout=timeout,
+        ),
         args=batches,
         num_workers=num_workers,
         **parallel_kwargs,

@@ -261,6 +261,7 @@ def remove_trees_from_lists(
         ),
         args=batches,
         num_workers=num_workers,
+        desc="Removing Deep Trees",
         **parallel_kwargs,
     )
 

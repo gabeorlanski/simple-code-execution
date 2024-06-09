@@ -38,14 +38,13 @@ async def _async_write_executables(
     if enable_tqdm:
         gen = tqdm_asyncio.as_completed(tasks, desc="Writing Executables")
     else:
-
         gen = asyncio.as_completed(tasks)
     out = []
     for result in gen:
         res = await result
         out.append(res)
-        if len(out) % 50_000 == 0:
-            logger.debug(f"Wrote {len(out)}/{len(pred_list)} predictions")
+        if len(out) % 100_000 == 0:
+            logger.info(f"Wrote {len(out)}/{len(pred_list)} predictions")
 
     return out
 
@@ -135,8 +134,8 @@ async def _async_cleanup(
     for result in gen:
         _ = await result
         completed += 1
-        if completed % 25_000 == 0:
-            logger.debug(f"Wrote {completed}/{len(pred_list)} predictions")
+        if completed % 100_000 == 0:
+            logger.info(f"Deleted {completed}/{len(pred_list)} predictions")
 
 
 def _cleanup_worker(batch):

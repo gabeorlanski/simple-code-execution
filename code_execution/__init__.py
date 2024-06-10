@@ -9,7 +9,9 @@ from code_execution.code_trees import remove_deep_trees
 from code_execution.code_trees import safe_ast_parse
 from code_execution.code_trees import wrap_assert_in_try_print
 from code_execution.configs import ExecutionConfig
+from code_execution.data_structures import Command
 from code_execution.data_structures import CommandResult
+from code_execution.data_structures import CommandsToRun
 from code_execution.data_structures import Executable
 from code_execution.data_structures import ExecutionResult
 from code_execution.entrypoints import execute_predictions

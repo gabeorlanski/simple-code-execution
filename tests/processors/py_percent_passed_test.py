@@ -4,15 +4,15 @@ from pathlib import Path
 
 import pytest
 
-from code_execution.execution import CommandResult
+from code_execution.data_structures import Command
+from code_execution.data_structures import CommandResult
+from code_execution.data_structures import CommandsToRun
 from code_execution.execution import serial_execute_code
 from code_execution.processors.python import percent_passed
 from code_execution.processors.utils import PredictionOutcome
 from code_execution.processors.utils import get_prediction_outcome
 from code_execution.processors.utils import get_processor
 from code_execution.processors.utils import parse_tc_stdout
-from code_execution.utils import ContextTimeLimitException
-from code_execution.utils import time_limit
 
 
 @pytest.fixture()
@@ -120,13 +120,11 @@ def test_execution(basic_prediction, preprocessor, postprocessor, tmpdir):
     cmd = ["python", "main.py"]
 
     result = serial_execute_code(
-        {
-            "idx": 0,
-            "sub_idx": 0,
-            "cwd": cwd,
-            "commands": [{"command": cmd, "timeout": 10, "num_times": 1}],
-            "tracked_files": [],
-        }
+        CommandsToRun(
+            cwd=cwd,
+            commands=[Command(command=cmd, timeout=10, num_times=1)],
+            tracked_files=[],
+        )
     )
     assert result.last_cmd.return_code == 0
     assert not result.timed_out

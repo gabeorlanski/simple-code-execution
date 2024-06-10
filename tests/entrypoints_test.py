@@ -7,8 +7,9 @@ from code_execution import Executable
 from code_execution import ExecutionConfig
 from code_execution import entrypoints
 from code_execution import safe_ast_parse
-from code_execution.execution import CommandResult
-from code_execution.execution import ExecutionResult
+from code_execution.data_structures import Command
+from code_execution.data_structures import CommandResult
+from code_execution.data_structures import ExecutionResult
 
 
 @pytest.fixture()
@@ -22,7 +23,7 @@ def dummy_proc(i, num_returns):
     if num_returns == 1:
         return Executable(
             files={"test": i},
-            commands=[{"cmd": 0, "timeout": 1}],
+            commands=[Command(command=0, timeout=1)],
             tracked_files=[],
         )
     return [
@@ -30,7 +31,7 @@ def dummy_proc(i, num_returns):
             files={
                 "test": i,
             },
-            commands=[{"cmd": j, "timeout": 1}],
+            commands=[Command(command=j, timeout=1)],
             tracked_files=[],
         )
         for j in range(num_returns)
@@ -62,7 +63,7 @@ def dummy_proc_filtered(i):
                 files={
                     "test": i,
                 },
-                commands=[{"cmd": 0, "timeout": 1}],
+                commands=[{"command": 0, "timeout": 1}],
                 tracked_files=[],
             ),
             _make_dummy_execution_result("0"),
@@ -74,7 +75,7 @@ def dummy_proc_filtered(i):
                 files={
                     "test": i,
                 },
-                commands=[{"cmd": 0, "timeout": 1}],
+                commands=[{"command": 0, "timeout": 1}],
                 tracked_files=[],
             ),
         ]
@@ -83,7 +84,7 @@ def dummy_proc_filtered(i):
             files={
                 "test": i,
             },
-            commands=[{"cmd": j, "timeout": 1}],
+            commands=[{"command": j, "timeout": 1}],
             tracked_files=[],
         )
         for j in range(2)
@@ -102,7 +103,11 @@ def test_preproc(execution_config, num_returns, num_workers, tmpdir):
         for j in range(num_returns):
             expected_files.append((f"{i}.{j}", {"test": i}))
             expected_commands.append(
-                {"idx": i, "sub_idx": j, "commands": [{"cmd": j, "timeout": 1}]}
+                {
+                    "idx": i,
+                    "sub_idx": j,
+                    "commands": [Command(command=j, timeout=1)],
+                }
             )
 
     execution_config.num_workers = num_workers
@@ -123,7 +128,7 @@ def test_preproc(execution_config, num_returns, num_workers, tmpdir):
 
     for actual, expected in zip(commands, expected_commands):
         assert actual["key"] == (expected["idx"], expected["sub_idx"])
-        assert actual["executable"]["commands"] == expected["commands"]
+        assert actual["executable"].commands == expected["commands"]
 
 
 @pytest.mark.parametrize("num_returns", [1, 2], ids=["single", "multiple"])
@@ -138,7 +143,11 @@ def test_preproc_batched(execution_config, num_returns, num_workers, tmpdir):
         for j in range(num_returns):
             expected_files.append((f"{i}.{j}", {"test": i}))
             expected_commands.append(
-                {"idx": i, "sub_idx": j, "commands": [{"cmd": j, "timeout": 1}]}
+                {
+                    "idx": i,
+                    "sub_idx": j,
+                    "commands": [Command(command=j, timeout=1)],
+                }
             )
 
     execution_config.num_workers = num_workers
@@ -159,7 +168,7 @@ def test_preproc_batched(execution_config, num_returns, num_workers, tmpdir):
 
     for actual, expected in zip(commands, expected_commands):
         assert actual["key"] == (expected["idx"], expected["sub_idx"])
-        assert actual["executable"]["commands"] == expected["commands"]
+        assert actual["executable"].commands == expected["commands"]
 
 
 def test_preproc_filtered_out(execution_config, tmpdir):

@@ -9,9 +9,10 @@ from code_execution.code_trees import remove_deep_trees
 from code_execution.code_trees import safe_ast_parse
 from code_execution.code_trees import wrap_assert_in_try_print
 from code_execution.configs import ExecutionConfig
+from code_execution.data_structures import CommandResult
+from code_execution.data_structures import Executable
+from code_execution.data_structures import ExecutionResult
 from code_execution.entrypoints import execute_predictions
-from code_execution.execution import CommandResult
-from code_execution.execution import ExecutionResult
 from code_execution.processors import ParsedTestResults
 from code_execution.processors import PredictionOutcome
 from code_execution.processors import get_postprocessor
@@ -19,6 +20,5 @@ from code_execution.processors import get_prediction_outcome
 from code_execution.processors import get_preprocessor
 from code_execution.processors import get_processor
 from code_execution.processors import parse_tc_stdout
-from code_execution.utils import Executable
 from code_execution.utils import get_module_and_call
 from code_execution.utils import run_in_parallel

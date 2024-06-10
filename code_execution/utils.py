@@ -15,6 +15,7 @@ from typing import Callable, Dict, Generator, List, Optional, Tuple
 from tqdm import tqdm
 
 from code_execution import utility_modules
+from code_execution.data_structures import Executable
 
 LOGGING_IS_CONFIGURED = logging.getLogger().hasHandlers()
 
@@ -98,15 +99,6 @@ def time_limit(seconds: float):
     finally:
         if seconds != -1:
             signal.setitimer(signal.ITIMER_REAL, 0)
-
-
-@dataclass(frozen=True)
-class Executable:
-    """Dataclass to represent the commands and setup needed to execute a prediction."""
-
-    files: Dict[str, str]
-    commands: List[Dict]
-    tracked_files: List[str] = field(default_factory=list)
 
 
 SUPPORTED_MODULES = {

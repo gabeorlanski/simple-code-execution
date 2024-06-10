@@ -15,8 +15,12 @@ import numpy as np
 import psutil
 from tqdm import tqdm
 
-from .configs import ExecutionConfig
-from .utils import get_results_from_generator
+from code_execution.configs import ExecutionConfig
+from code_execution.data_structures import Command
+from code_execution.data_structures import CommandResult
+from code_execution.data_structures import CommandsToRun
+from code_execution.data_structures import ExecutionResult
+from code_execution.utils import get_results_from_generator
 
 LOGGING_IS_CONFIGURED = logging.getLogger().hasHandlers()
 
@@ -29,105 +33,6 @@ def seconds_to_human(seconds):
     hours, seconds = divmod(seconds, 3600)
     minutes, seconds = divmod(seconds, 60)
     return f"{int(hours):02d}:{int(minutes):02d}:{seconds:05.2f}"
-
-
-@dataclasses.dataclass(frozen=True)
-class CommandResult:
-    """Dataclass for the result of executing a command.
-
-    Args:
-        return_code: The return code.
-        runtime: The runtime.
-        stdout: The stdout.
-        stderr: The stderr.
-        timed_out: Whether the command timed out.
-        had_unexpected_error: Whether the command had an unexpected error.
-    """
-
-    return_code: int
-    runtime: float
-    stdout: str
-    stderr: str
-    timed_out: bool
-    had_unexpected_error: bool = False
-
-
-@dataclasses.dataclass(frozen=True)
-class ExecutionResult:
-    """Dataclass for the result of executing a list of commands.
-
-    Args:
-        command_results: The results of the commands.
-        elapsed: The elapsed time.
-        cwd: The current working directory.
-        tracked_files: The tracked files.
-    """
-
-    command_results: List[CommandResult]
-    elapsed: float
-    cwd: str
-    tracked_files: Dict[str, str]
-
-    @property
-    def timed_out(self) -> bool:
-        """Whether the last command timed out."""
-        if not self.command_results:
-            return False
-        return self.command_results[-1].timed_out
-
-    @property
-    def had_error(self) -> bool:
-        """Whether the last command had an error."""
-        if not self.command_results:
-            return True
-        return self.command_results[-1].return_code != 0
-
-    @property
-    def last_cmd(self) -> CommandResult:
-        """The last command result."""
-        if not self.command_results:
-            return None
-        return self.command_results[-1]
-
-    def to_dict(self) -> Dict:
-        """Converts the result to a dictionary."""
-        return {
-            "command_results": [
-                dataclasses.asdict(r) for r in self.command_results
-            ],
-            "cwd": self.cwd,
-            "tracked_files": self.tracked_files,
-            "elapsed": self.elapsed,
-        }
-
-    @classmethod
-    def invalid_result(
-        cls,
-        num_commands: int = 1,
-        runtime: float = 10.0,
-        return_code: int = 1,
-        stdout: str = "SyntaxError",
-        stderr: str = "Invalid",
-        elapsed: float = 10.0,
-    ) -> "ExecutionResult":
-        """Creates a dummy ExecutionResult that represents an invalid result.
-        Useful for when your preprocessor finds a program you want to skip
-        execution for."""
-        return cls(
-            command_results=[
-                CommandResult(
-                    return_code=return_code,
-                    runtime=runtime,
-                    stdout=stdout,
-                    stderr=stderr,
-                    timed_out=False,
-                )
-                for _ in range(num_commands)
-            ],
-            elapsed=elapsed,
-            cwd=None,
-            tracked_files={},
-        )
 
 
 def _execute(
@@ -221,14 +126,14 @@ def safe_execute(
     return CommandResult(**res)
 
 
-def serial_execute_code(sample: Dict) -> ExecutionResult:
+def serial_execute_code(sample: CommandsToRun) -> ExecutionResult:
     """Execute a file of code.
     Args:
         sample: The sample to run.
     Returns:
         The execution result.
     """
-    file_path = sample["cwd"]
+    file_path = sample.cwd
     working_dir_for_execution = (
         file_path.parent if file_path.is_file() else file_path
     )
@@ -236,21 +141,21 @@ def serial_execute_code(sample: Dict) -> ExecutionResult:
     working_dir_for_execution = working_dir_for_execution.resolve().absolute()
     results = []
     t0 = time.time()
-    for command in sample["commands"]:
+    for command in sample.commands:
+
         res = safe_execute(
-            command["command"],
+            command.command,
             working_dir=working_dir_for_execution,
-            timeout=command["timeout"],
-            num_times=command.get("num_times", 1),
+            timeout=command.timeout,
+            num_times=command.num_times,
         )
         results.append(res)
-        if res.timed_out:
-            break
-        if res.return_code != 0:
-            break
+        if res.timed_out or res.return_code != 0:
+            if not sample.ensure_all_run and not command.ignore_error:
+                break
 
     file_contents = {}
-    for fn in sample["tracked_files"]:
+    for fn in sample.tracked_files:
         fp = file_path.joinpath(fn)
         if fp.exists():
             file_contents[fn] = fp.read_text(encoding="utf-8")

@@ -11,6 +11,9 @@ from typing import Callable, Dict, List, Tuple, Union
 from tqdm import tqdm
 
 from code_execution.configs import ExecutionConfig
+from code_execution.data_structures import Command
+from code_execution.data_structures import CommandsToRun
+from code_execution.data_structures import Executable
 from code_execution.execution import CommandResult
 from code_execution.execution import ExecutionResult
 from code_execution.execution import execute_commands
@@ -117,8 +120,13 @@ def preprocess_commands(
         files_to_write.append((idx_use, exec_command.files, pred_dir))
         cmds = []
         for command in exec_command.commands:
-            if command.get("timeout", None) is None:
-                command["timeout"] = config.default_timeout
+
+            # TODO(gabeorlanski): Remove this eventually when all preprocessors return Commands
+            if not isinstance(command, Command):
+                command = Command(**command)
+
+            if command.timeout is None:
+                command.timeout = config.default_timeout
             cmds.append(command)
         commands_to_run.append(
             {
@@ -126,11 +134,12 @@ def preprocess_commands(
                     idx,
                     sub_idx,
                 ),  # (idx, sub_idx) is the key for the result
-                "executable": {
-                    "cwd": pred_dir.resolve().absolute(),
-                    "commands": cmds,
-                    "tracked_files": exec_command.tracked_files,
-                },
+                "executable": CommandsToRun(
+                    cwd=pred_dir.resolve().absolute(),
+                    commands=cmds,
+                    tracked_files=exec_command.tracked_files,
+                    ensure_all_run=exec_command.ensure_all_run,
+                ),
             }
         )
     logger.info(f"{len(commands_to_run):,} commands to run")

@@ -8,6 +8,8 @@ import pytest
 
 from code_execution import execution
 from code_execution.configs import ExecutionConfig
+from code_execution.data_structures import Command
+from code_execution.data_structures import CommandsToRun
 
 
 def make_command(program, cwd: Path):
@@ -50,56 +52,53 @@ def test_safe_execute_fail(error_program, fail_print, tmpdir):
     assert result.stdout == fail_print + "\n"
 
 
-def test_execute_code(passing_program, tmpdir):
-    cwd = Path(tmpdir)
-    command = make_command(passing_program, cwd)
+@pytest.fixture()
+def dummy_commands(request):
+    yield [
+        Command(command=["python", "test.py"], timeout=1),
+    ] * request.param
 
-    exec_dict = {
-        "cwd": cwd,
-        "commands": [
-            {
-                "command": command,
-                "timeout": 1,
-            },
-            {
-                "command": command,
-                "timeout": 1,
-            },
-        ],
-        "tracked_files": ["test.py"],
-    }
 
-    result = execution.serial_execute_code(exec_dict)
+def make_cmd_to_run(prog, cwd, commands=None):
+    cwd = Path(cwd)
+
+    with cwd.joinpath("test.py").open("w") as f:
+        f.write(prog)
+
+    if commands is None:
+        commands = [Command(command=["python", "test.py"], timeout=1)]
+
+    return CommandsToRun(
+        cwd=cwd,
+        commands=commands,
+        tracked_files=["test.py"],
+    )
+
+
+@pytest.fixture()
+def pass_cmd_to_run(passing_program, tmpdir, request):
+    cmds = [Command(command=["python", "test.py"], timeout=1)] * request.param
+    yield make_cmd_to_run(passing_program, tmpdir, cmds)
+
+
+@pytest.mark.parametrize("pass_cmd_to_run", [1, 2], indirect=True)
+def test_execute_code(passing_program, pass_cmd_to_run):
+    result = execution.serial_execute_code(pass_cmd_to_run)
     assert not result.had_error
     assert not result.timed_out
-    assert len(result.command_results) == 2
-    assert result.command_results[0].return_code == 0
-    assert result.command_results[1].return_code == 0
+    assert len(result.command_results) == len(pass_cmd_to_run.commands)
+    assert all(r.return_code == 0 for r in result.command_results)
     assert result.tracked_files == {
         "test.py": passing_program,
     }
 
 
-def test_execute_code_fail(error_program, tmpdir):
-    cwd = Path(tmpdir)
-    command = make_command(error_program, cwd)
+@pytest.mark.parametrize("num_commands", [1, 2])
+def test_execute_code_fail(error_program, tmpdir, num_commands):
+    cmd = [Command(command=["python", "test.py"], timeout=1)] * num_commands
+    cmd_to_run = make_cmd_to_run(error_program, tmpdir, commands=cmd)
 
-    exec_dict = {
-        "cwd": cwd,
-        "commands": [
-            {
-                "command": command,
-                "timeout": 1,
-            },
-            {
-                "command": command,
-                "timeout": 1,
-            },
-        ],
-        "tracked_files": ["test.py"],
-    }
-
-    result = execution.serial_execute_code(exec_dict)
+    result = execution.serial_execute_code(cmd_to_run)
     assert result.had_error
     assert not result.timed_out
     assert len(result.command_results) == 1
@@ -109,26 +108,13 @@ def test_execute_code_fail(error_program, tmpdir):
     }
 
 
-def test_execute_code_timeout(timeout_program, tmpdir):
-    cwd = Path(tmpdir)
-    command = make_command(timeout_program, cwd)
+@pytest.mark.parametrize("dummy_commands", [1, 2], indirect=True)
+def test_execute_code_timeout(timeout_program, tmpdir, dummy_commands):
+    cmd_to_run = make_cmd_to_run(
+        timeout_program, tmpdir, commands=dummy_commands
+    )
 
-    exec_dict = {
-        "cwd": cwd,
-        "commands": [
-            {
-                "command": command,
-                "timeout": 1,
-            },
-            {
-                "command": command,
-                "timeout": 1,
-            },
-        ],
-        "tracked_files": ["test.py"],
-    }
-
-    result = execution.serial_execute_code(exec_dict)
+    result = execution.serial_execute_code(cmd_to_run)
     assert not result.had_error
     assert result.timed_out
     assert len(result.command_results) == 1
@@ -221,11 +207,11 @@ def test_parallel_code_execution(
         commands.append(
             {
                 "key": (i, 0),
-                "executable": {
-                    "commands": [{"command": command, "timeout": 2}],
-                    "cwd": pred_dir,
-                    "tracked_files": [],
-                },
+                "executable": CommandsToRun(
+                    commands=[Command(command=command, timeout=2)],
+                    cwd=pred_dir,
+                    tracked_files=[],
+                ),
             }
         )
 
@@ -243,3 +229,63 @@ def test_parallel_code_execution(
     assert len(results) == len(predictions)
     assert all(not r.had_error for r in results)
     assert all(r.last_cmd.return_code == 0 for r in results)
+
+
+def make_ignore_error_test(
+    passing_program, failing_program, cwd, ignore_errors, cmds
+):
+    cwd = Path(cwd)
+    with cwd.joinpath("fail.py").open("w") as f:
+        f.write(failing_program)
+    with cwd.joinpath("pass.py").open("w") as f:
+        f.write(passing_program)
+
+    pass_cmd = Command(
+        command=["python", "pass.py"],
+        timeout=1,
+        ignore_error=ignore_errors == "cmd",
+    )
+    fail_cmd = Command(
+        command=["python", "fail.py"],
+        timeout=1,
+        ignore_error=ignore_errors == "cmd",
+    )
+    commands = []
+    first_fail = None
+    for command in cmds:
+        if command == "F":
+
+            commands.append(fail_cmd)
+            if ignore_errors == "none" and first_fail is None:
+                first_fail = len(commands)
+        else:
+            commands.append(pass_cmd)
+    first_fail = first_fail or len(commands)
+    command_to_run = CommandsToRun(
+        cwd=cwd,
+        commands=commands,
+        tracked_files=[],
+        ensure_all_run=ignore_errors == "all",
+    )
+
+    return first_fail, command_to_run
+
+
+@pytest.mark.parametrize("ignore_errors", ["all", "cmd", "none"])
+@pytest.mark.parametrize("cmds", ["PPP", "FFF", "PFP", "F", "P", "FPP"])
+def test_execute_ignore_errors(
+    passing_program, error_program, tmpdir, ignore_errors, cmds
+):
+    first_fail, to_run = make_ignore_error_test(
+        passing_program, error_program, tmpdir, ignore_errors, cmds
+    )
+
+    result = execution.serial_execute_code(to_run)
+
+    assert len(result.command_results) == first_fail
+    for actual, expected in zip(result.command_results, cmds):
+        if expected == "P":
+            assert actual.return_code == 0
+        else:
+            assert actual.return_code != 0
+            assert not actual.had_unexpected_error

@@ -1,9 +1,9 @@
+import ast
 from copy import deepcopy
 
 import pytest
 
 from code_execution import code_trees
-import ast
 
 
 def test_remove_deep_code():

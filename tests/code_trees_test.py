@@ -48,7 +48,7 @@ def test_remove_deep_code():
     "test_list,expected",
     [
         [("f(x)", "1", False), "assert f(x) == 1"],
-        [("f(x)", "1.0", True), "assert f(x) - 1.0 < 1e-06"],
+        [("f(x)", "1.0", True), "assert abs(f(x) - 1.0) < 1e-06"],
     ],
     ids=["simple", "float"],
 )

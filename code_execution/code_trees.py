@@ -84,8 +84,16 @@ def convert_call_to_assert(
     if requires_float:
         tree.body[-1] = ast.Assert(
             test=ast.Compare(
-                left=ast.BinOp(
-                    left=tree.body[-1].value, op=ast.Sub(), right=out_tree
+                left=ast.Call(
+                    func=ast.Name("abs", ctx=ast.Load()),
+                    args=[
+                        ast.BinOp(
+                            left=tree.body[-1].value,
+                            op=ast.Sub(),
+                            right=out_tree,
+                        )
+                    ],
+                    keywords=[],
                 ),
                 ops=[ast.Lt()],
                 comparators=[ast.Constant(value=1e-6, kind=float)],

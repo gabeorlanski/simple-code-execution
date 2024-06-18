@@ -95,15 +95,19 @@ def test_postprocess_base(test_1, test_2, postprocessor):
     assert math.isclose(runtime, 0.2)
 
 
-def test_execution(basic_prediction, preprocessor, postprocessor, tmpdir):
+@pytest.mark.parametrize("solution_file", ["solution", "tt"])
+def test_execution(
+    basic_prediction, preprocessor, postprocessor, tmpdir, solution_file
+):
     cwd = Path(tmpdir)
     imports, context, call_code = preprocessor(
         entry_point=basic_prediction["entry_point"],
         test_cases=basic_prediction["test_cases"],
         tc_timeout=0.25,
+        entry_file=solution_file,
     )
 
-    with open(cwd / "solution.py", "w") as f:
+    with open(cwd / f"{solution_file}.py", "w") as f:
         f.write(basic_prediction["solution"])
     main_code = (
         imports
@@ -116,7 +120,6 @@ def test_execution(basic_prediction, preprocessor, postprocessor, tmpdir):
     )
     with open(cwd / "main.py", "w") as f:
         f.write(main_code)
-
     cmd = ["python", "main.py"]
 
     result = serial_execute_code(

@@ -135,6 +135,7 @@ def preprocess(
     test_cases: Union[Tuple[str, str, bool], str, List[ast.AST]],
     tc_imports: Optional[str] = None,
     tc_timeout: Optional[int] = None,
+    entry_file: str = "solution",
 ) -> Tuple[str, str, str]:
     """Preprocess the prediction for a percent passed execution.
 
@@ -143,6 +144,7 @@ def preprocess(
         test_cases (Union[Tuple[str, str, bool], str, List[ast.AST]]): The test cases to use.
         tc_imports (Optional[str], optional): The imports for the test cases. Defaults to None.
         tc_timeout (Optional[int], optional): The timeout for each individual test case. Defaults to None.
+        entry_file (str, optional): The name of the entry file. Defaults to "solution".
 
     Returns:
         Tuple[str, str, str]: Imports, context, and the call code.
@@ -162,7 +164,7 @@ def preprocess(
 
     test_runner = _make_test_runner(
         len(test_cases),
-        "solution",
+        entry_file,
         entry_point,
     )
 

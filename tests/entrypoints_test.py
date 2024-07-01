@@ -339,7 +339,6 @@ def test_error_dir(tmpdir, execution_config, idx_type):
     assert len(errors) == 10
     for i, e in enumerate(errors):
         assert e == {
-            **raw_preds[i],
             "use_idx": expected_idx[i],
             "files": write_preds[i][1],
             "pred_dir": str(write_preds[i][2]),

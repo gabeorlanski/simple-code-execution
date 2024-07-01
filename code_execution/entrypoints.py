@@ -238,7 +238,6 @@ def _write_maybe_save_error_dir(
                     error_f.write(
                         json.dumps(
                             {
-                                **raw_preds[use_idx],
                                 "use_idx": idx,
                                 "files": files,
                                 "pred_dir": str(pred_dir),

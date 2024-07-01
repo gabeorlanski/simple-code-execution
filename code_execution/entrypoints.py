@@ -1,12 +1,13 @@
 """ Module for entrypoints for code execution. """
 
+import json
 import logging
 import os
 import tempfile
 from collections import defaultdict
 from dataclasses import asdict
 from pathlib import Path
-from typing import Callable, Dict, List, Tuple, Union
+from typing import Callable, Dict, List, Optional, Tuple, Union
 
 from tqdm import tqdm
 
@@ -68,6 +69,7 @@ def preprocess_commands(
         preprocessor: The preprocessor to use.
         preproc_returns_list: Whether the preprocessor returns a list of executables.
         batch_size: The batch size to use for execution.
+        error_directory: The directory to save errors to.
     Returns:
         files_to_write: The files to write to disk.
         commands_to_run: The commands to run.
@@ -204,6 +206,38 @@ def postprocess_commands(
     return out
 
 
+def _write_maybe_save_error_dir(
+    config, files, raw_preds, exec_dir: Path, error_directory: Optional[Path]
+):
+    try:
+        write_executables(
+            files_to_write=files,
+            write_rate_limit=config.write_rate_limit,
+            enable_tqdm=config.display_write_progress,
+        )
+    except Exception as e:
+        if error_directory:
+            error_directory.mkdir(parents=True, exist_ok=True)
+            with error_directory.joinpath("exec_files.txt").open("w") as dir_f:
+                for f in os.listdir(exec_dir.absolute()):
+                    dir_f.write(f"{exec_dir/f}\n")
+
+            error_file = error_directory.joinpath("errors.jsonl")
+            with error_file.open("w") as error_f:
+                for idx, files, pred_dir in files:
+                    error_f.write(
+                        json.dumps(
+                            {
+                                **raw_preds[idx],
+                                "files": files,
+                                "pred_dir": str(pred_dir),
+                            }
+                        )
+                        + "\n"
+                    )
+        raise e
+
+
 def execute_predictions(
     config: ExecutionConfig,
     pred_list: List[Dict],
@@ -212,6 +246,7 @@ def execute_predictions(
     debug_dir: Path = None,
     preproc_returns_list: bool = False,
     preproc_batch_size: int = 1,
+    error_directory: Optional[Path] = None,
 ) -> List[Dict]:
     """Executes the program predictions.
 
@@ -230,7 +265,7 @@ def execute_predictions(
         preproc_returns_list (bool, optional): Is the preprocess function one-to-one
             or one-to-many. Defaults to False.
         preproc_batch_size (int, optional): The batch size for preprocessing. Defaults to 1.
-
+        error_directory (Path, optional): The directory to save errors to. Defaults to None.
     Returns:
         List[Dict]: The executed predictions.
     """
@@ -288,10 +323,12 @@ def execute_predictions(
             if len(file_chunks) > 1:
                 logger.info(f"Executing chunk {chunk_idx+1}/{len(file_chunks)}")
 
-            write_executables(
-                files_to_write=files,
-                write_rate_limit=config.write_rate_limit,
-                enable_tqdm=config.display_write_progress,
+            _write_maybe_save_error_dir(
+                config=config,
+                files=files,
+                raw_preds=pred_list,
+                exec_dir=dir_to_use,
+                error_directory=error_directory,
             )
             all_results.extend(execute_commands(commands, config))
 

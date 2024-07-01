@@ -1,5 +1,6 @@
 """ Utility functions for code execution. """
 
+import asyncio
 import contextlib
 import functools
 import gc
@@ -7,15 +8,13 @@ import inspect
 import logging
 import multiprocessing as mp
 import signal
-from dataclasses import dataclass
-from dataclasses import field
+import threading
 from pathlib import Path
-from typing import Callable, Dict, Generator, List, Optional, Tuple
+from typing import Callable, Generator, List, Optional, Tuple
 
 from tqdm import tqdm
 
 from code_execution import utility_modules
-from code_execution.data_structures import Executable
 
 LOGGING_IS_CONFIGURED = logging.getLogger().hasHandlers()
 
@@ -37,6 +36,38 @@ def in_notebook():
     except AttributeError:
         return False
     return True
+
+
+class RunThread(threading.Thread):
+    """Class that will allow asycnio to run in a thread when called from Jupyter."""
+
+    def __init__(self, func, *args, **kwargs):
+        self.func = func
+        self.args = args
+        self.kwargs = kwargs
+        self.result = None
+        self.had_error = False
+        super().__init__()
+
+    def run(self):
+        try:
+            self.result = asyncio.run(self.func(*self.args, **self.kwargs))
+        except Exception as e:
+            self.result = e
+            self.had_error = True
+
+
+def notebook_safe_async_run(target, *args, **kwargs):
+    """Run an async function in a thread."""
+    if in_notebook():
+        thread = RunThread(target, *args, **kwargs)
+        thread.start()
+        thread.join()
+        if thread.had_error:
+            raise thread.result
+        return thread.result
+
+    return asyncio.run(target(*args, **kwargs))
 
 
 def _batched_wrapper(batch, processor, proc_returns_list):

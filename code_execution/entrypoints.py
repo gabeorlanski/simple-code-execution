@@ -21,7 +21,6 @@ from code_execution.file_writing import cleanup
 from code_execution.file_writing import write_executables
 from code_execution.processors.utils import ParsedTestResults
 from code_execution.processors.utils import PredictionOutcome
-from code_execution.utils import Executable
 from code_execution.utils import get_pred_dir
 from code_execution.utils import run_in_parallel
 from code_execution.utils import wrap_processor
@@ -213,7 +212,6 @@ def execute_predictions(
     debug_dir: Path = None,
     preproc_returns_list: bool = False,
     preproc_batch_size: int = 1,
-    use_mp_for_writing: bool = False,
 ) -> List[Dict]:
     """Executes the program predictions.
 
@@ -232,9 +230,6 @@ def execute_predictions(
         preproc_returns_list (bool, optional): Is the preprocess function one-to-one
             or one-to-many. Defaults to False.
         preproc_batch_size (int, optional): The batch size for preprocessing. Defaults to 1.
-        use_mp_for_writing (bool, optional): Use multiprocessing instead of
-            asyncio for writing files. Defaults to False. Note that this needs to
-            be enabled in notebooks.
 
     Returns:
         List[Dict]: The executed predictions.
@@ -296,7 +291,6 @@ def execute_predictions(
             write_executables(
                 files_to_write=files,
                 write_rate_limit=config.write_rate_limit,
-                use_mp=use_mp_for_writing,
                 enable_tqdm=config.display_write_progress,
             )
             all_results.extend(execute_commands(commands, config))
@@ -307,7 +301,6 @@ def execute_predictions(
                     files,
                     rate_limit=config.write_rate_limit,
                     enable_tqdm=config.display_write_progress,
-                    use_mp=use_mp_for_writing,
                 )
         all_results = {result[0]: result[1] for result in all_results}
         all_results.update(filtered_results)

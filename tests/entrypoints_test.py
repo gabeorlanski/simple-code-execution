@@ -11,6 +11,8 @@ from code_execution.data_structures import Command
 from code_execution.data_structures import CommandResult
 from code_execution.data_structures import ExecutionResult
 
+from unittest import mock
+
 
 @pytest.fixture()
 def execution_config():
@@ -242,7 +244,7 @@ def execution_entrypoint_fixture(passing_program):
     "max_at_once", [1, 2, -1], ids=["single", "double", "all"]
 )
 @pytest.mark.parametrize(
-    "use_mp", [True, False], ids=["multiprocessing", "async"]
+    "in_notebook", [True, False], ids=["multiprocessing", "async"]
 )
 def test_execute_predictions(
     execution_config,
@@ -250,18 +252,20 @@ def test_execute_predictions(
     tmpdir,
     passing_program,
     max_at_once,
-    use_mp,
+    in_notebook,
 ):
     cwd = Path(tmpdir)
     execution_config.max_execute_at_once = max_at_once
-    results = entrypoints.execute_predictions(
-        execution_config,
-        pred_list=execution_entrypoint_fixture,
-        preprocessor=_preprocessor,
-        postprocessor=_postprocessor,
-        debug_dir=cwd,
-        use_mp_for_writing=use_mp,
-    )
+    with mock.patch(
+        "code_execution.utils.in_notebook", return_value=in_notebook
+    ):
+        results = entrypoints.execute_predictions(
+            execution_config,
+            pred_list=execution_entrypoint_fixture,
+            preprocessor=_preprocessor,
+            postprocessor=_postprocessor,
+            debug_dir=cwd,
+        )
 
     assert len(results) == len(execution_entrypoint_fixture)
 

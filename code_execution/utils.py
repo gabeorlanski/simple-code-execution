@@ -60,13 +60,14 @@ class RunThread(threading.Thread):
 def notebook_safe_async_run(target, *args, **kwargs):
     """Run an async function in a thread."""
     if in_notebook():
+        logger.info("Running in separate thread due to notebook.")
         thread = RunThread(target, *args, **kwargs)
         thread.start()
         thread.join()
         if thread.had_error:
             raise thread.result
         return thread.result
-
+    logger.info("Running in main thread.")
     return asyncio.run(target(*args, **kwargs))
 
 

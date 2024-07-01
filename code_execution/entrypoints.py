@@ -216,6 +216,8 @@ def _write_maybe_save_error_dir(
             enable_tqdm=config.display_write_progress,
         )
     except Exception as e:
+        logger.exception("Error writing executables")
+
         if error_directory:
             error_directory.mkdir(parents=True, exist_ok=True)
             with error_directory.joinpath("exec_files.txt").open("w") as dir_f:
@@ -225,10 +227,19 @@ def _write_maybe_save_error_dir(
             error_file = error_directory.joinpath("errors.jsonl")
             with error_file.open("w") as error_f:
                 for idx, files, pred_dir in files:
+                    if isinstance(idx, str):
+                        use_idx = int(idx.split(".")[0])
+                    elif isinstance(idx, tuple):
+                        use_idx = idx[0]
+                        idx = f"{idx[0]}.{idx[1]}"
+                    else:
+                        use_idx = int(idx)
+
                     error_f.write(
                         json.dumps(
                             {
-                                **raw_preds[idx],
+                                **raw_preds[use_idx],
+                                "use_idx": idx,
                                 "files": files,
                                 "pred_dir": str(pred_dir),
                             }

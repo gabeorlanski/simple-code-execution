@@ -295,17 +295,29 @@ def test_execute_predictions(
             assert preds[i] == passing_program
 
 
-def test_error_dir(tmpdir, execution_config):
+@pytest.mark.parametrize("idx_type", ["int", "str", "tuple"])
+def test_error_dir(tmpdir, execution_config, idx_type):
 
     tmpdir = Path(tmpdir)
     exec_dir = tmpdir.joinpath("exec")
     raw_preds = []
     write_preds = []
+    expected_idx = []
     exec_dir.mkdir(parents=True, exist_ok=True)
     for i in range(10):
         with open(exec_dir / f"pred{i}", "w") as f:
             f.write("test")
-        write_preds.append((i, {f"pred{i}": "test"}, exec_dir / f"pred{i}"))
+
+        idx = i
+        if idx_type == "str":
+            idx = f"{i}.0"
+            expected_idx.append(f"{i}.0")
+        elif idx_type == "tuple":
+            idx = (i, 0)
+            expected_idx.append(f"{i}.0")
+        else:
+            expected_idx.append(i)
+        write_preds.append((idx, {f"pred{i}": "test"}, exec_dir / f"pred{i}"))
         raw_preds.append({"test_key": i})
     with mock.patch(
         "code_execution.entrypoints.write_executables",
@@ -328,6 +340,7 @@ def test_error_dir(tmpdir, execution_config):
     for i, e in enumerate(errors):
         assert e == {
             **raw_preds[i],
+            "use_idx": expected_idx[i],
             "files": write_preds[i][1],
             "pred_dir": str(write_preds[i][2]),
         }

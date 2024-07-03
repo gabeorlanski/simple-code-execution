@@ -235,8 +235,8 @@ def _write_maybe_save_error_dir(
                     else:
                         use_idx = int(idx)
 
-                    error_f.write(
-                        json.dumps(
+                    try:
+                        to_write = json.dumps(
                             {
                                 "use_idx": idx,
                                 "pred": raw_preds[use_idx],
@@ -244,8 +244,16 @@ def _write_maybe_save_error_dir(
                                 "pred_dir": str(pred_dir),
                             }
                         )
-                        + "\n"
-                    )
+                    except json.JSONDecodeError:
+                        to_write = json.dumps(
+                            {
+                                "use_idx": idx,
+                                "files": "Error decoding files",
+                                "pred_dir": str(pred_dir),
+                            }
+                        )
+
+                    error_f.write(to_write + "\n")
         raise e
 
 

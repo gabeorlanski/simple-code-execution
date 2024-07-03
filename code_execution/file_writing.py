@@ -14,6 +14,12 @@ from code_execution import utils
 logger = logging.getLogger(__name__)
 
 
+class WritingFailure(Exception):
+    """Exception raised when writing a file fails."""
+
+    pass
+
+
 async def _async_write_executables(
     pred_list: List[Dict],
     rate_limit: int,
@@ -28,10 +34,22 @@ async def _async_write_executables(
 
             for name, contents in files.items():
                 filepath = pred_dir.joinpath(name)
-                async with aiofiles.open(
-                    str(filepath), "w", encoding="utf-8"
-                ) as f:
-                    await f.write(contents)
+                try:
+                    async with aiofiles.open(
+                        str(filepath), "w", encoding="utf-8"
+                    ) as f:
+                        await f.write(contents)
+                except Exception as e:
+                    logger.error(
+                        "Error writing file %s to %s: %s",
+                        name,
+                        pred_dir,
+                        e,
+                    )
+                    logger.error("Contents: %s", contents)
+                    raise WritingFailure(
+                        f"Failed to write {name} to {pred_dir} because of {e}"
+                    ) from e
             return idx, pred_dir.resolve().absolute()
 
     tasks = [write_pred(*p) for p in pred_list]

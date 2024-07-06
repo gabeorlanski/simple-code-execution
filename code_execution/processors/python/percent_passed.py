@@ -6,10 +6,7 @@ from typing import List, Optional, Set, Tuple, Union
 
 from ...code_trees import convert_call_to_assert
 from ...execution import CommandResult
-from ...utils import ContextTimeLimitException
-from ...utils import time_limit
 from ..utils import FAIL_STR
-from ..utils import FORMAT_ERROR_MSG
 from ..utils import PASS_STR
 from ..utils import ParsedTestResults
 from ..utils import PredictionOutcome

@@ -282,3 +282,17 @@ def run_in_parallel(
 
     pbar_generator.close()
     return results
+
+
+def configure_logging(
+    level: int = logging.INFO, format: str = None, datefmt: str = None
+):
+    root = logging.getLogger("code_execution")
+    root.propagate = True
+    root.setLevel(level)
+    if format is None:
+        format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    if datefmt is None:
+        datefmt = "%Y-%m-%d %H:%M:%S"
+    console = logging.StreamHandler()
+    console.setFormatter(logging.Formatter(format, datefmt=datefmt))

@@ -285,7 +285,7 @@ def run_in_parallel(
 
 
 def configure_logging(
-    level: int = logging.INFO, format: str = None, datefmt: str = None
+    level: int = logging.DEBUG, format: str = None, datefmt: str = None
 ):
     root = logging.getLogger("code_execution")
     root.propagate = True

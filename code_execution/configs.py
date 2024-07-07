@@ -4,6 +4,10 @@ from dataclasses import dataclass
 from multiprocessing import cpu_count
 from typing import Optional
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 @dataclass
 class ExecutionConfig:
@@ -45,6 +49,7 @@ class ExecutionConfig:
     def __post_init__(self):
         if self.num_workers < 1 or self.num_workers >= cpu_count():
             self.num_workers = cpu_count() - 4
+        logger.info(f"Using {self.num_workers} workers for execution")
 
     @property
     def batched(self):

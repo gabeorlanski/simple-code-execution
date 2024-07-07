@@ -25,7 +25,7 @@ from code_execution.utils import get_results_from_generator
 
 logger = logging.getLogger(__name__)
 
-LOGGING_IS_CONFIGURED = logger.hasHandlers()
+LOGGING_IS_CONFIGURED = logger.getLogger().hasHandlers()
 
 
 def seconds_to_human(seconds):

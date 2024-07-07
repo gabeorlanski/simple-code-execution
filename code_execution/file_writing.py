@@ -24,6 +24,7 @@ async def _async_write_executables(
     pred_list: List[Dict],
     rate_limit: int,
     enable_tqdm: bool,
+    log_freq: int,
 ):
     """Writes the executables to the disk asynchronously."""
     sem = asyncio.Semaphore(rate_limit)
@@ -61,7 +62,7 @@ async def _async_write_executables(
     for result in gen:
         res = await result
         out.append(res)
-        if len(out) % 100_000 == 0:
+        if len(out) % log_freq == 0:
             logger.info(f"Wrote {len(out)}/{len(pred_list)} predictions")
 
     return out
@@ -71,6 +72,7 @@ def write_executables(
     files_to_write: List[Tuple],
     write_rate_limit: int,
     enable_tqdm: bool = False,
+    log_freq: int = 100_000,
 ):
     """Writes the executables to the disk.
 
@@ -95,6 +97,7 @@ def write_executables(
         pred_list=files_to_write,
         rate_limit=write_rate_limit,
         enable_tqdm=enable_tqdm,
+        log_freq=log_freq,
     )
     logger.debug("Ensuring all files written...")
     for idx, r in out_results:

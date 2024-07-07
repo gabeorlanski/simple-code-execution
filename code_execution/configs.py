@@ -25,6 +25,7 @@ class ExecutionConfig:
         log_freq: How often to log progress.
         buffer_size: Chunk size to use for execution.
         display_write_progress: Display progress bars for writing and cleaning up.
+        write_log_freq: Frequency for writing log messages.
     """
 
     num_workers: int
@@ -39,6 +40,7 @@ class ExecutionConfig:
     log_freq: int = 1000
     buffer_size: int = 100
     display_write_progress: bool = False
+    write_log_freq: int = 100_000
 
     def __post_init__(self):
         if self.num_workers < 1 or self.num_workers >= cpu_count():

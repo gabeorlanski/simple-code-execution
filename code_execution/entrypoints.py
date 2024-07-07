@@ -83,6 +83,11 @@ def preprocess_commands(
         returns_list=preproc_returns_list,
     )
     if batch_size > 1:
+        logger.debug(
+            "Chunking %s predictions into batches of %d",
+            f"{len(pred_list):,}",
+            batch_size,
+        )
         process_args = []
         current_batch = []
         for idx, pred in enumerate(pred_list):
@@ -96,7 +101,7 @@ def preprocess_commands(
         process_args = [
             {"idx": idx, "args": [pred]} for idx, pred in enumerate(pred_list)
         ]
-
+    logger.debug("Processing %d batche(s)", len(process_args))
     results = run_in_parallel(
         executable_creator,
         process_args,
@@ -214,6 +219,7 @@ def _write_maybe_save_error_dir(
             files_to_write=files,
             write_rate_limit=config.write_rate_limit,
             enable_tqdm=config.display_write_progress,
+            log_freq=config.write_log_freq,
         )
     except Exception as e:
         logger.exception("Error writing executables")
@@ -291,8 +297,13 @@ def execute_predictions(
     if postprocessor is None:
         logger.info("Using default postprocessor")
         postprocessor = default_postprocessor
+    logger.debug(
+        "Starting execution with %s predictions", f"{len(pred_list):,}"
+    )
 
     def _run(dir_to_use):
+        logger.debug("Using %s as execution directory", dir_to_use)
+        logger.debug("Preprocessing commands")
         files_to_write, commands_to_run, filtered_results = preprocess_commands(
             config=config,
             dir_to_use=dir_to_use,

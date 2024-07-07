@@ -99,8 +99,10 @@ def wrap_processor(
 ) -> Callable:
     """Wraps a processor function to handle batching."""
     if batch_size > 1:
+        logger.debug("Using batched processing with size %d", batch_size)
         wrapper = _batched_wrapper
     else:
+        logger.debug("Using normal processing")
         wrapper = _normal_wrapper
     return functools.partial(
         wrapper, processor=processor_fn, proc_returns_list=returns_list
@@ -230,9 +232,11 @@ def run_in_parallel(
         List: The results of `target(a)` for each `a` in `args`.
     """
     logger.debug(
-        "Starting run_in_parallel for %s",
+        "Starting run_in_parallel for %s.",
         desc or getattr(target, "__name__", "Target"),
     )
+
+    logger.debug("Will use %d/%d CPUs", num_workers, mp.cpu_count())
 
     generator_creator = functools.partial(
         tqdm,

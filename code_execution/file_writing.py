@@ -100,6 +100,7 @@ def write_executables(
     for idx, r in out_results:
         if not r.exists():
             raise ValueError(f"Directory for {idx} does not exist at {r}")
+    logger.info("Wrote all files to disk")
 
 
 async def _async_cleanup(

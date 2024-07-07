@@ -22,10 +22,10 @@ from code_execution.data_structures import CommandsToRun
 from code_execution.data_structures import ExecutionResult
 from code_execution.utils import get_results_from_generator
 
-LOGGING_IS_CONFIGURED = logging.getLogger().hasHandlers()
-
 
 logger = logging.getLogger(__name__)
+
+LOGGING_IS_CONFIGURED = logger.hasHandlers()
 
 
 def seconds_to_human(seconds):

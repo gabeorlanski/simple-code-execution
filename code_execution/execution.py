@@ -248,7 +248,10 @@ def _parallel_execute_code(
     )
     max_threads = max(max_processes // num_executors, 1)
     logger.debug("max_threads=%d", max_threads)
+    logger.debug("execute_batch_size=%d", execute_batch_size)
+    logger.debug("len(to_run)//max_threads=%d", len(to_run) // max_threads)
     manager_process = psutil.Process()
+    logger.debug("manager_process=%s", manager_process)
     chunk_size = min(execute_batch_size, len(to_run) // max_threads)
     logger.debug("chunk_size=%d", chunk_size)
     # initialize cpu percent

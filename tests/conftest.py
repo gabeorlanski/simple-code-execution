@@ -42,3 +42,8 @@ def error_program(fail_print):
 @pytest.fixture()
 def timeout_program(pass_print):
     yield f"from time import sleep\nprint('{pass_print}')\nsleep(10)"
+
+
+@pytest.fixture()
+def stdin_program():
+    yield "print('Input 1: ' + input())\nprint('Input 2: ' + input())"

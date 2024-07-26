@@ -1,10 +1,9 @@
 """ This file contains the configuration for the code execution module. """
 
+import logging
 from dataclasses import dataclass
 from multiprocessing import cpu_count
 from typing import Optional
-
-import logging
 
 logger = logging.getLogger(__name__)
 

@@ -289,3 +289,15 @@ def test_execute_ignore_errors(
         else:
             assert actual.return_code != 0
             assert not actual.had_unexpected_error
+
+
+def test_execute_stdin(stdin_program, tmpdir):
+    cwd = Path(tmpdir)
+    command = make_command(stdin_program, cwd)
+    command = CommandsToRun(
+        cwd=cwd,
+        commands=[Command(command=command, timeout=1, stdin="1\n2\n4\n")],
+    )
+    result = execution.serial_execute_code(command)
+    assert result.command_results[0].stdout == "Input 1: 1\nInput 2: 2\n"
+    

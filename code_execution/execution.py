@@ -9,7 +9,7 @@ import pathlib
 import subprocess
 import time
 from datetime import datetime
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import psutil
@@ -21,7 +21,6 @@ from code_execution.data_structures import CommandResult
 from code_execution.data_structures import CommandsToRun
 from code_execution.data_structures import ExecutionResult
 from code_execution.utils import get_results_from_generator
-
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +35,10 @@ def seconds_to_human(seconds):
 
 
 def _execute(
-    command_to_run: List[str], working_dir: pathlib.Path, timeout: int
+    command_to_run: List[str],
+    working_dir: pathlib.Path,
+    timeout: int,
+    stdin: Optional[str] = None,
 ) -> Dict:
     """Executes a single command."""
     timed_out = False
@@ -51,10 +53,14 @@ def _execute(
         cwd=str(working_dir),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        stdin=subprocess.PIPE,
     )
+    stdin = stdin.encode("utf-8") if stdin else None
     try:
         try:
-            outputs = execution_process.communicate(timeout=timeout)
+            outputs = execution_process.communicate(
+                input=stdin, timeout=timeout
+            )
             t1 = time.time()
             stdout = outputs[0].decode("utf-8")
             stderr = outputs[1].decode("utf-8")
@@ -92,6 +98,7 @@ def safe_execute(
     working_dir: pathlib.Path,
     timeout: int = 10,
     num_times: int = 1,
+    stdin: Optional[str] = None,
 ) -> CommandResult:
     """Executes a list of commands safely.
     Args:
@@ -106,7 +113,7 @@ def safe_execute(
     times = []
     had_error = False
     for _ in range(num_times):
-        res = _execute(command_to_run, working_dir, timeout)
+        res = _execute(command_to_run, working_dir, timeout, stdin=stdin)
         times.append(res["runtime"])
         if res["return_code"] != 0:
             had_error = True
@@ -148,6 +155,7 @@ def serial_execute_code(sample: CommandsToRun) -> ExecutionResult:
             working_dir=working_dir_for_execution,
             timeout=command.timeout,
             num_times=command.num_times,
+            stdin=command.stdin,
         )
         results.append(res)
         if res.timed_out or res.return_code != 0:

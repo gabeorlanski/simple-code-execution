@@ -13,12 +13,14 @@ class Command:
         command: The command to execute.
         timeout: The timeout for the command. If not set, the default timeout is used.
         num_times: Number of times to execute the command.
+        stdin: The stdin for the command.
         ignore_error: Whether to ignore errors and continue execution.
     """
 
     command: List[str]
     timeout: Optional[int] = None
     num_times: int = 1
+    stdin: Optional[str] = None
     ignore_error: bool = False
 
 

@@ -23,8 +23,8 @@ from code_execution.processors import get_prediction_outcome
 from code_execution.processors import get_preprocessor
 from code_execution.processors import get_processor
 from code_execution.processors import parse_tc_stdout
+from code_execution.utils import configure_logging
 from code_execution.utils import get_module_and_call
 from code_execution.utils import run_in_parallel
-from code_execution.utils import configure_logging
 
 configure_logging()

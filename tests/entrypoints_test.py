@@ -293,4 +293,3 @@ def test_execute_predictions(
             assert preds[i] != passing_program
         else:
             assert preds[i] == passing_program
-

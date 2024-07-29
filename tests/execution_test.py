@@ -300,4 +300,17 @@ def test_execute_stdin(stdin_program, tmpdir):
     )
     result = execution.serial_execute_code(command)
     assert result.command_results[0].stdout == "Input 1: 1\nInput 2: 2\n"
-    
+
+
+def test_execute_looped_stdin(loop_stdin_program, tmpdir):
+    cwd = Path(tmpdir)
+    command = make_command(loop_stdin_program, cwd)
+    command = CommandsToRun(
+        cwd=cwd,
+        commands=[Command(command=command, timeout=1, stdin="1\n2\n4\n")],
+    )
+    result = execution.serial_execute_code(command)
+    assert result.command_results[0].stdout == "Input: 1\nInput: 2\nInput: 4\n"
+    assert result.command_results[0].stderr.endswith(
+        "EOFError: EOF when reading a line\n"
+    )

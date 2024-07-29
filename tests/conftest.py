@@ -47,3 +47,8 @@ def timeout_program(pass_print):
 @pytest.fixture()
 def stdin_program():
     yield "print('Input 1: ' + input())\nprint('Input 2: ' + input())"
+
+
+@pytest.fixture()
+def loop_stdin_program():
+    yield "while True:\n    print('Input: ' + input())"

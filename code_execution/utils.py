@@ -2,6 +2,7 @@
 
 import asyncio
 import contextlib
+import errno
 import functools
 import gc
 import inspect
@@ -115,16 +116,35 @@ class ContextTimeLimitException(Exception):
     """Timeout error for running commands."""
 
 
+def timeout_signal_handler(signum, frame):
+    raise ContextTimeLimitException(errno.ETIME)
+
+
+def timeout_decorator(seconds: int = 10):
+    def decorator(func):
+
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            signal.signal(signal.SIGALRM, timeout_signal_handler)
+            signal.alarm(seconds)
+            try:
+                result = func(*args, **kwargs)
+            finally:
+                signal.alarm(0)
+            return result
+
+        return wrapper
+
+    return decorator
+
+
 @contextlib.contextmanager
 def time_limit(seconds: float):
     """Sets a time limit."""
 
-    def signal_handler(signum, frame):
-        raise ContextTimeLimitException("Timed out!")
-
     if seconds != -1:
         signal.setitimer(signal.ITIMER_REAL, seconds)
-        signal.signal(signal.SIGALRM, signal_handler)
+        signal.signal(signal.SIGALRM, timeout_signal_handler)
     try:
         yield
     finally:

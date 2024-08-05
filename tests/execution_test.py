@@ -291,23 +291,32 @@ def test_execute_ignore_errors(
             assert not actual.had_unexpected_error
 
 
-def test_execute_stdin(stdin_program, tmpdir):
+@pytest.mark.parametrize("as_list",[True, False])
+def test_execute_stdin(stdin_program, tmpdir,as_list):
     cwd = Path(tmpdir)
+    stdin = ["1", "2", "4"]
+    if not as_list:
+        stdin = "\n".join(stdin)
     command = make_command(stdin_program, cwd)
     command = CommandsToRun(
         cwd=cwd,
-        commands=[Command(command=command, timeout=1, stdin="1\n2\n4\n")],
+        commands=[Command(command=command, timeout=1, stdin=stdin)],
     )
     result = execution.serial_execute_code(command)
+    
     assert result.command_results[0].stdout == "Input 1: 1\nInput 2: 2\n"
 
 
-def test_execute_looped_stdin(loop_stdin_program, tmpdir):
+@pytest.mark.parametrize("as_list",[True, False])
+def test_execute_looped_stdin(loop_stdin_program, tmpdir,as_list):
     cwd = Path(tmpdir)
+    stdin = ["1", "2", "4"]
+    if not as_list:
+        stdin = "\n".join(stdin)
     command = make_command(loop_stdin_program, cwd)
     command = CommandsToRun(
         cwd=cwd,
-        commands=[Command(command=command, timeout=1, stdin="1\n2\n4\n")],
+        commands=[Command(command=command, timeout=1, stdin=stdin)],
     )
     result = execution.serial_execute_code(command)
     assert result.command_results[0].stdout == "Input: 1\nInput: 2\nInput: 4\n"

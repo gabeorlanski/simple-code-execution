@@ -20,7 +20,7 @@ class Command:
     command: List[str]
     timeout: Optional[int] = None
     num_times: int = 1
-    stdin: Optional[str] = None
+    stdin: List[str] = dataclasses.field(default_factory=list)
     ignore_error: bool = False
 
 

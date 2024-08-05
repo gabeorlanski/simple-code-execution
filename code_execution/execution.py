@@ -38,7 +38,7 @@ def _execute(
     command_to_run: List[str],
     working_dir: pathlib.Path,
     timeout: int,
-    stdin: Optional[str] = None,
+    stdin: Optional[str|List[str]] = None,
 ) -> Dict:
     """Executes a single command."""
     timed_out = False
@@ -55,7 +55,12 @@ def _execute(
         stderr=subprocess.PIPE,
         stdin=subprocess.PIPE,
     )
-    stdin = stdin.encode("utf-8") if stdin else None
+    if stdin:
+        if isinstance(stdin, list):
+            stdin = "\n".join(stdin)
+        stdin = stdin.encode("utf-8")
+    else:
+        stdin = None
     try:
         try:
             outputs = execution_process.communicate(

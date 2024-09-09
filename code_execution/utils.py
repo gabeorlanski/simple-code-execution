@@ -12,7 +12,7 @@ import signal
 import threading
 from pathlib import Path
 from typing import Callable, Generator, List, Optional, Tuple
-
+import os
 from tqdm import tqdm
 
 from code_execution import utility_modules
@@ -120,17 +120,50 @@ def timeout_signal_handler(signum, frame):
     raise ContextTimeLimitException(errno.ETIME)
 
 
+# Timeout for windows.
+class TimeoutContext:
+    def __init__(self, seconds, on_end=None):
+        self.seconds = seconds
+        self.timer = None
+        self.error_raised = False
+        self.on_end = on_end
+
+    def _timeout_handler(self):
+        self.error_raised = True
+
+    def __enter__(self):
+        self.timer = threading.Timer(self.seconds, self._timeout_handler)
+        self.timer.start()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.timer is not None:
+            self.timer.cancel()
+        if self.error_raised:
+            raise ContextTimeLimitException(
+                f"Operation timed out after {self.seconds} seconds"
+            )
+
+
+ON_WINDOWS = os.name == "nt"
+
+
 def timeout_decorator(seconds: int = 10):
     def decorator(func):
 
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            signal.signal(signal.SIGALRM, timeout_signal_handler)
-            signal.alarm(seconds)
-            try:
-                result = func(*args, **kwargs)
-            finally:
-                signal.alarm(0)
+            if not ON_WINDOWS:
+
+                signal.signal(signal.SIGALRM, timeout_signal_handler)
+                signal.alarm(seconds)
+                try:
+                    result = func(*args, **kwargs)
+                finally:
+                    signal.alarm(0)
+            else:
+                with TimeoutContext(seconds):
+                    result = func(*args, **kwargs)
+
             return result
 
         return wrapper
@@ -139,16 +172,21 @@ def timeout_decorator(seconds: int = 10):
 
 
 @contextlib.contextmanager
-def time_limit(seconds: float):
+def time_limit(seconds: float, on_end: Callable = None):
     """Sets a time limit."""
+    if seconds == -1:
+        yield
+        return
 
-    if seconds != -1:
+    if ON_WINDOWS:
+        with TimeoutContext(seconds, on_end):
+            yield
+    else:
         signal.setitimer(signal.ITIMER_REAL, seconds)
         signal.signal(signal.SIGALRM, timeout_signal_handler)
-    try:
-        yield
-    finally:
-        if seconds != -1:
+        try:
+            yield
+        finally:
             signal.setitimer(signal.ITIMER_REAL, 0)
 
 

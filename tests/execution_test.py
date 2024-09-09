@@ -254,7 +254,6 @@ def make_ignore_error_test(
     first_fail = None
     for command in cmds:
         if command == "F":
-
             commands.append(fail_cmd)
             if ignore_errors == "none" and first_fail is None:
                 first_fail = len(commands)
@@ -291,8 +290,8 @@ def test_execute_ignore_errors(
             assert not actual.had_unexpected_error
 
 
-@pytest.mark.parametrize("as_list",[True, False])
-def test_execute_stdin(stdin_program, tmpdir,as_list):
+@pytest.mark.parametrize("as_list", [True, False])
+def test_execute_stdin(stdin_program, tmpdir, as_list):
     cwd = Path(tmpdir)
     stdin = ["1", "2", "4"]
     if not as_list:
@@ -303,12 +302,12 @@ def test_execute_stdin(stdin_program, tmpdir,as_list):
         commands=[Command(command=command, timeout=1, stdin=stdin)],
     )
     result = execution.serial_execute_code(command)
-    
+
     assert result.command_results[0].stdout == "Input 1: 1\nInput 2: 2\n"
 
 
-@pytest.mark.parametrize("as_list",[True, False])
-def test_execute_looped_stdin(loop_stdin_program, tmpdir,as_list):
+@pytest.mark.parametrize("as_list", [True, False])
+def test_execute_looped_stdin(loop_stdin_program, tmpdir, as_list):
     cwd = Path(tmpdir)
     stdin = ["1", "2", "4"]
     if not as_list:

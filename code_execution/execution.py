@@ -38,7 +38,7 @@ def _execute(
     command_to_run: List[str],
     working_dir: pathlib.Path,
     timeout: int,
-    stdin: Optional[str|List[str]] = None,
+    stdin: Optional[str | List[str]] = None,
 ) -> Dict:
     """Executes a single command."""
     timed_out = False
@@ -154,7 +154,6 @@ def serial_execute_code(sample: CommandsToRun) -> ExecutionResult:
     results = []
     t0 = time.time()
     for command in sample.commands:
-
         res = safe_execute(
             command.command,
             working_dir=working_dir_for_execution,

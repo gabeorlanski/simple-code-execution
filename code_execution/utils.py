@@ -8,11 +8,12 @@ import gc
 import inspect
 import logging
 import multiprocessing as mp
+import os
 import signal
 import threading
 from pathlib import Path
 from typing import Callable, Generator, List, Optional, Tuple
-import os
+
 from tqdm import tqdm
 
 from code_execution import utility_modules
@@ -149,11 +150,9 @@ ON_WINDOWS = os.name == "nt"
 
 def timeout_decorator(seconds: int = 10):
     def decorator(func):
-
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             if not ON_WINDOWS:
-
                 signal.signal(signal.SIGALRM, timeout_signal_handler)
                 signal.alarm(seconds)
                 try:

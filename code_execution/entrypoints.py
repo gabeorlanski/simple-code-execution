@@ -126,7 +126,6 @@ def preprocess_commands(
         files_to_write.append((idx_use, exec_command.files, pred_dir))
         cmds = []
         for command in exec_command.commands:
-
             # TODO(gabeorlanski): Remove this eventually when all preprocessors return Commands
             if not isinstance(command, Command):
                 command = Command(**command)
@@ -199,7 +198,6 @@ def postprocess_commands(
         )
 
     for key, result in res_generator:
-
         prediction = raw_preds[key[0]]
         processed = postprocessor(prediction, result)
         out.append(processed)

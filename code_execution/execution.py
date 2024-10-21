@@ -291,12 +291,6 @@ def _parallel_execute_code(
         is_batched=is_batched,
     )
 
-    progress_writer = (
-        logger.info
-        if LOGGING_IS_CONFIGURED
-        else lambda m: print(f"{datetime.now().isoformat(' ','seconds')} {m}")
-    )
-
     last_log = last_pct = 0
     chunks_completed = 0
     with mp.Pool(processes=num_executors) as pool:
@@ -318,6 +312,7 @@ def _parallel_execute_code(
                 rate_str = f"{rate:0.2f} P/S"
                 prog_str = f"{prog:0.2%}"
                 print(
+                    f"{datetime.now().isoformat(' ','seconds')} "
                     f"{prog_str:>6} @ {rate_str:<12} in {seconds_to_human(elapsed)} ETA: {eta}"
                 )
 
@@ -338,7 +333,7 @@ def _parallel_execute_code(
         pool.close()
         pool.terminate()
 
-    progress_writer(
+    logger.info(
         f"Finished executing {len(results):,} in {seconds_to_human(time.time() - start_time)}"
     )
 

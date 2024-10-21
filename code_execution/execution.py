@@ -298,6 +298,7 @@ def _parallel_execute_code(
             results.extend(result)
             chunks_completed += 1
             chunks_pct = math.floor(chunks_completed / len(chunks) * 10)
+
             if len(results) - last_log >= log_freq or chunks_pct > last_pct:
                 last_pct = chunks_pct
                 last_log = len(results)
@@ -316,19 +317,19 @@ def _parallel_execute_code(
                     f"{prog_str:>6} @ {rate_str:<12} in {seconds_to_human(elapsed)} ETA: {eta}"
                 )
 
+                interval_start = time.time()
+            if chunks_completed % 10 == 0:
                 logger.debug(
-                    f"{len(results):>9,}/{total_commands:<9,} total finished"
+                    f"{len(results):>9,}/{total_commands:<9,} total finished in {seconds_to_human(t1 - start_time)}"
                 )
                 one_min_cpu, _, fifteen_min_cpu = [
                     x / psutil.cpu_count() for x in psutil.getloadavg()
                 ]
 
                 logger.debug(
-                    f""
                     f"Memory={sizeof_fmt(manager_process.memory_info().rss)} "
                     f"CPU: 1Min={one_min_cpu:0.2%} 15Min={fifteen_min_cpu:0.2%}"
                 )
-                interval_start = time.time()
 
         pool.close()
         pool.terminate()

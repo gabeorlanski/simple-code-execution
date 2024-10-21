@@ -12,6 +12,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
+import math
 import psutil
 from tqdm import tqdm
 
@@ -296,11 +297,15 @@ def _parallel_execute_code(
         else lambda m: print(f"{datetime.now().isoformat(' ','seconds')} {m}")
     )
 
-    last_log = 0
+    last_log = last_pct = 0
+    chunks_completed = 0
     with mp.Pool(processes=num_executors) as pool:
         for result in pool.imap_unordered(threaded_fn, chunks):
             results.extend(result)
-            if len(results) - last_log >= log_freq:
+            chunks_completed += 1
+            chunks_pct = math.floor(chunks_completed / len(chunks) * 10)
+            if len(results) - last_log >= log_freq or chunks_pct > last_pct:
+                last_pct = chunks_pct
                 last_log = len(results)
                 t1 = time.time()
                 interval_elapsed = t1 - interval_start
@@ -312,17 +317,19 @@ def _parallel_execute_code(
                 interval_received = len(results)
                 rate_str = f"{rate:0.2f} P/S"
                 prog_str = f"{prog:0.2%}"
-                msg = (
-                    f"{len(results):>9,}/{total_commands:<9,}({prog_str:>6}) @ {rate_str:<12}"
-                    f" in {seconds_to_human(elapsed)} ETA: {eta}"
+                print(
+                    f"{prog_str:>6} @ {rate_str:<12} in {seconds_to_human(elapsed)} ETA: {eta}"
                 )
-                logger.debug(msg)
-                print(msg)
+
+                logger.debug(
+                    f"{len(results):>9,}/{total_commands:<9,} total finished"
+                )
                 one_min_cpu, _, fifteen_min_cpu = [
                     x / psutil.cpu_count() for x in psutil.getloadavg()
                 ]
 
                 logger.debug(
+                    f""
                     f"Memory={sizeof_fmt(manager_process.memory_info().rss)} "
                     f"CPU: 1Min={one_min_cpu:0.2%} 15Min={fifteen_min_cpu:0.2%}"
                 )

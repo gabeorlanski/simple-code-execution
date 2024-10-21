@@ -312,10 +312,14 @@ def _parallel_execute_code(
                 interval_received = len(results)
                 rate_str = f"{rate:0.2f} P/S"
                 prog_str = f"{prog:0.2%}"
-                progress_writer(
+                msg = (
                     f"{len(results):>9,}/{total_commands:<9,}({prog_str:>6}) @ {rate_str:<12}"
                     f" in {seconds_to_human(elapsed)} ETA: {eta}"
                 )
+                if LOGGING_IS_CONFIGURED or logger.level <= logging.DEBUG:
+                    logger.info(msg)
+                else:
+                    print(msg)
                 one_min_cpu, _, fifteen_min_cpu = [
                     x / psutil.cpu_count() for x in psutil.getloadavg()
                 ]

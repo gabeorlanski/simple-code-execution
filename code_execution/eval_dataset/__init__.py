@@ -1,1 +1,1 @@
-from gsm8k import evaluate_gsm8k
+from code_execution.eval_dataset.gsm8k import evaluate_gsm8k

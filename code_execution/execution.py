@@ -10,7 +10,7 @@ import subprocess
 import time
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
-
+import math
 import numpy as np
 import math
 import psutil
@@ -291,7 +291,8 @@ def _parallel_execute_code(
         is_batched=is_batched,
     )
 
-    last_log = last_pct = 0
+    last_log = last_chunk_log = 0
+    chunks_finished = last_pct = 0
     chunks_completed = 0
     with mp.Pool(processes=num_executors) as pool:
         for result in pool.imap_unordered(threaded_fn, chunks):
@@ -301,6 +302,13 @@ def _parallel_execute_code(
 
             if len(results) - last_log >= log_freq or chunks_pct > last_pct:
                 last_pct = chunks_pct
+            chunks_finished += 1
+            if (
+                len(results) - last_log >= log_freq
+                or math.floor(10 * chunks_finished / len(chunks))
+                > last_chunk_log
+            ):
+                last_chunk_log = math.floor(10 * chunks_finished / len(chunks))
                 last_log = len(results)
                 t1 = time.time()
                 interval_elapsed = t1 - interval_start

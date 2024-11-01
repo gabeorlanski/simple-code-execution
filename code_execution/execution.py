@@ -4,15 +4,15 @@ import concurrent.futures
 import dataclasses
 import functools
 import logging
+import math
 import multiprocessing as mp
 import pathlib
 import subprocess
 import time
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
-import math
+
 import numpy as np
-import math
 import psutil
 from tqdm import tqdm
 

@@ -15,20 +15,35 @@ logger = logging.getLogger(__name__)
 
 
 def preprocess(
-    pred_dict: Dict, timeout: int = 10, entrypoint: str = "solution"
+    pred_dict: Dict,
+    timeout: int = 10,
+    entrypoint: str = "solution",
+    solution_key: str = "solution",
 ) -> Executable:
+    """Preprocesses the GSM8K prediction into an executable. Expected keys in the pred_dict are:
+    - "answer" or "target": the expected output
+    - "solutions": a list of strings or dicts containing the solution code.
+    """
     if "answer" in pred_dict:
         answer = pred_dict["answer"].split("####")[-1]
     elif "target" in pred_dict:
         answer = pred_dict["target"]
     answer = answer.replace(",", "").replace("$", "").replace(" ", "")
     out = []
-    for solution in pred_dict["solutions"]:
+    for _i, solution in enumerate(pred_dict["solutions"]):
+        if isinstance(solution, dict):
+            sol_str = solution[solution_key]
+        elif isinstance(solution, list):
+            sol_str = solution
+        else:
+            raise TypeError(
+                f"Expected solution to be either a dict or a string, got {type(solution)} for idx={_i}"
+            )
 
         out.append(
             Executable(
                 files={
-                    "main.py": f"{solution}\n\nassert {entrypoint}() == {answer}"
+                    "main.py": f"{sol_str}\n\nassert {entrypoint}() == {answer}"
                 },
                 commands=[Command(["python3", "main.py"], timeout=timeout)],
             )
@@ -61,6 +76,7 @@ def evaluate_gsm8k(
     num_workers: int,
     timeout: int = 10,
     entrypoint: int = "solution",
+    solution_key: str = "solution",
     k_vals: List[int] = None,
 ) -> Tuple[Dict, List[Dict]]:
     logger.debug("Adding index column to dataset")
@@ -74,7 +90,10 @@ def evaluate_gsm8k(
         pred_list=dataset,
         config=ExecutionConfig(num_workers=num_workers),
         preprocessor=partial(
-            preprocess, timeout=timeout, entrypoint=entrypoint
+            preprocess,
+            timeout=timeout,
+            entrypoint=entrypoint,
+            solution_key=solution_key,
         ),
         postprocessor=postprocess,
         preproc_returns_list=True,

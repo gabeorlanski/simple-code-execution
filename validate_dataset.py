@@ -2,23 +2,37 @@ import json
 
 from datasets import load_dataset
 
-from code_execution.datasets.gsm8k import evaluate_gsm8k
+from code_execution.eval_dataset.apps import evaluate_apps
+
+
+def process_ex(ex):
+    try:
+        solutions = json.loads(ex["solutions"])
+    except:
+        solutions = None
+
+    try:
+        io = json.loads(ex["input_output"])
+    except:
+        io = None
+
+    return {
+        **ex,
+        "solutions": solutions,
+        "input_output": io,
+    }
 
 
 def main():
-    dataset = load_dataset("openai/gsm8k", "main", split="test")
+    dataset = load_dataset("codeparrot/apps", split="test")
 
-    def proc(ex):
-        if "target" in ex:
-            answer = ex["target"]
-        else:
-            answer = ex["answer"].split("#")[-1]
-        answer = answer.replace(",", "").replace("$", "").replace(" ", "")
-        answer = f"def solution():\n    return {answer}"
-        return {"solutions": [answer]}
-
-    dataset = dataset.map(proc)
-    metrics, results = evaluate_gsm8k(dataset, num_workers=4)
+    metrics, results = evaluate_apps(
+        dataset,
+        num_workers=4,
+        timeout=4,
+        execution_kwargs={"log_freq": 1},
+        command_timeout=3.0,
+    )
     print(json.dumps(metrics, indent=2))
 
 

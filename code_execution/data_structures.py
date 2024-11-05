@@ -2,7 +2,7 @@
 
 import dataclasses
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 
 @dataclasses.dataclass(frozen=True)
@@ -18,7 +18,7 @@ class Command:
     """
 
     command: List[str]
-    timeout: Optional[int] = None
+    timeout: Optional[float] = None
     num_times: int = 1
     stdin: List[str] = dataclasses.field(default_factory=list)
     ignore_error: bool = False
@@ -123,6 +123,11 @@ class ExecutionResult:
         )
 
 
+def _default_should_early_stop(*_, **_k) -> bool:
+    _ = _k
+    return False
+
+
 @dataclasses.dataclass(frozen=True)
 class Executable:
     """Dataclass to represent the commands and setup needed to execute a prediction.
@@ -133,12 +138,16 @@ class Executable:
         tracked_files: The files to get contents of after execution.
         ensure_all_run: Whether to ignore errors and continue. This will override
             individual command settings. Default is False.
+        should_early_stop: A function that takes the index of the command and the result, returning a bool if the execution should stop early. THIS MUST BE PICKLEABLE
     """
 
     files: Dict[str, str]
     commands: List[Command]
     tracked_files: List[str] = dataclasses.field(default_factory=list)
     ensure_all_run: bool = False
+    should_early_stop: Callable[[int, CommandResult], bool] = (
+        _default_should_early_stop
+    )
 
 
 @dataclasses.dataclass(frozen=True)
@@ -160,3 +169,6 @@ class CommandsToRun:
     commands: List[Command]
     tracked_files: List[str] = dataclasses.field(default_factory=list)
     ensure_all_run: bool = False
+    should_early_stop: Callable[[int, CommandResult], bool] = (
+        _default_should_early_stop
+    )

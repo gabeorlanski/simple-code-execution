@@ -154,7 +154,7 @@ def serial_execute_code(sample: CommandsToRun) -> ExecutionResult:
     working_dir_for_execution = working_dir_for_execution.resolve().absolute()
     results = []
     t0 = time.time()
-    for command in sample.commands:
+    for cidx, command in enumerate(sample.commands):
         res = safe_execute(
             command.command,
             working_dir=working_dir_for_execution,
@@ -163,9 +163,15 @@ def serial_execute_code(sample: CommandsToRun) -> ExecutionResult:
             stdin=command.stdin,
         )
         results.append(res)
-        if res.timed_out or res.return_code != 0:
-            if not sample.ensure_all_run and not command.ignore_error:
-                break
+        if res.timed_out or res.return_code != 0 or res.had_unexpected_error:
+            if sample.ensure_all_run:
+                continue
+            if command.ignore_error:
+                continue
+
+            break
+        elif sample.should_early_stop(cidx, res):
+            break
 
     file_contents = {}
     for fn in sample.tracked_files:
@@ -315,7 +321,10 @@ def _parallel_execute_code(
                 elapsed = t1 - start_time
                 interval_completed = len(results) - interval_received
                 prog = len(results) / total_commands
-                rate = interval_completed / interval_elapsed
+                if interval_elapsed == 0:
+                    rate = 1
+                else:
+                    rate = interval_completed / interval_elapsed
                 eta = seconds_to_human((total_commands - len(results)) / rate)
                 interval_received = len(results)
                 rate_str = f"{rate:0.2f} P/S"

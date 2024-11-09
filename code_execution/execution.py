@@ -330,8 +330,9 @@ def _parallel_execute_code(
                 rate_str = f"{rate:0.2f} P/S"
                 prog_str = f"{prog:0.2%}"
                 print(
-                    f"{datetime.now().isoformat(' ','seconds')} "
-                    f"{prog_str:>6} @ {rate_str:<12} in {seconds_to_human(elapsed)} ETA: {eta}"
+                    f"[{datetime.now().isoformat(' ','seconds')}] "
+                    f"Finished {prog_str:<6} @ {rate_str:<12} "
+                    f"in {seconds_to_human(elapsed)} ETA: {eta}"
                 )
 
                 interval_start = time.time()

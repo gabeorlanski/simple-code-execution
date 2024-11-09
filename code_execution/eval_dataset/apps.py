@@ -1,15 +1,13 @@
 """ Module for evaluating apps dataset. """
 
-import json
+import ujson
 import logging
 from functools import partial
-from typing import Dict, List, Tuple
-
-from datasets import Dataset
+from typing import Dict, List, Tuple, Optional
 
 from code_execution.data_structures import Command
 from code_execution.data_structures import Executable
-from code_execution.data_structures import ExecutionResult
+from code_execution.data_structures import ExecutionResult, CommandResult
 from code_execution.entrypoints import execute_predictions
 from code_execution.eval_dataset.metrics import estimate_pass_at_k
 from code_execution.execution import ExecutionConfig
@@ -63,62 +61,155 @@ def make_test_case(fn_name, inputs, outputs):
     return f"assert convert_output({fn_name}({','.join(map(repr,inputs))})) == {expected_out}"
 
 
+def process_raw_example(example):
+    try:
+        input_output = ujson.loads(example["input_output"])
+    except (ujson.JSONDecodeError, ValueError):
+        input_output = {"inputs": [], "outputs": []}
+
+    try:
+        solutions = ujson.loads(example["solutions"])
+    except ujson.JSONDecodeError:
+        solutions = []
+
+    # check if the solution is a class, so we can call the function Solution.fn_name
+    is_cls = any("class Solution" in s for s in solutions)
+
+    # convert these to strings for pyarrow
+    new_inputs = []
+    new_outputs = []
+    for inp, out in zip(input_output["inputs"], input_output["outputs"]):
+
+        if "fn_name" in input_output:
+            if is_cls:
+                use_fn_name = "Solution()." + input_output["fn_name"]
+            else:
+                use_fn_name = input_output["fn_name"]
+            new_inputs.append([make_test_case(use_fn_name, inp, out)])
+        elif isinstance(inp, list):
+            new_inputs.append(inp)
+            new_outputs.append("\n".join(out))
+        else:
+            new_inputs.append(inp.split("\n"))
+            new_outputs.append(out)
+
+    return {
+        **example,
+        "inputs": new_inputs,
+        "outputs": new_outputs,
+        "solutions": solutions,
+        "exec_mode": "asserts" if "fn_name" in input_output else "stdin",
+    }
+
+
+def should_stop_early(
+    cmd_idx: int, res: CommandResult, is_stdin: bool, expected_out: List[str]
+) -> bool:
+    if res.had_error or res.timed_out:
+        return True
+
+    if not is_stdin:
+        return False
+    if len(expected_out) <= cmd_idx:
+        return True
+
+    if res.stdout.replace("\r", "") != expected_out[cmd_idx]:
+        return True
+
+    return False
+
+
+def make_apps_executable(
+    solution: str,
+    inputs: List[List[str]],
+    outputs: List[str],
+    exec_mode: str,
+    timeout: int = 10,
+    command_timeout: float = 2.0,
+    max_commands: int = None,
+    early_stopping: bool = False,
+) -> List[Executable]:
+    files = {"main.py": solution}
+    if exec_mode == "stdin":
+        commands = []
+        for i in inputs:
+            commands.append(
+                Command(
+                    command=["python", "main.py"],
+                    timeout=command_timeout,
+                    stdin=i,
+                )
+            )
+            if max_commands and len(commands) >= max_commands:
+                break
+    elif exec_mode == "asserts":
+        # Leetcode needs imports to be in the solution
+        prog = (
+            APPS_IMPORT_STR + "\n\n" + APPS_OUTPUT_CONVERTER + "\n\n" + solution
+        )
+        files["main.py"] = prog + "\n\n" + "\n".join(inputs[0])
+        commands = [
+            Command(
+                command=["python", "main.py"],
+                timeout=timeout,
+            )
+        ]
+    else:
+        raise ValueError(f"Unknown exec_mode: {exec_mode}")
+    early_stop_fn = None
+    if early_stopping:
+        early_stop_fn = partial(
+            should_stop_early,
+            expected_out=outputs,
+            is_stdin=exec_mode == "stdin",
+        )
+    return Executable(
+        files=files,
+        commands=commands,
+        tracked_files=[],
+        ensure_all_run=False,
+        should_early_stop=early_stop_fn,
+    )
+
+
+def did_pred_pass(
+    command_result: ExecutionResult, uses_stdin: bool, expected_out: List[str]
+) -> bool:
+    if command_result.had_error or command_result.timed_out:
+        return False
+    if uses_stdin:
+        if len(command_result.command_results) < len(expected_out):
+            return False
+        actual = [
+            r.stdout.replace("\r", "") for r in command_result.command_results
+        ]
+        return actual == expected_out
+    return True
+
+
 def preprocessor(
     problem,
     timeout: int = 10,
     command_timeout: float = 2.0,
     max_commands: int = None,
+    early_stopping: bool = False,
 ) -> Executable:
     out = []
 
-    input_output = json.loads(problem["input_output"])
+    if "exec_mode" not in problem:
+        problem = process_raw_example(problem)
 
-    for sol in json.loads(problem["solutions"]):
-        files = {"main.py": sol}
-        if "fn_name" not in input_output:
-            commands = []
-            for i in input_output["inputs"]:
-                if isinstance(i, list):
-                    stdin = i
-                else:
-                    stdin = i.split("\n")
-                commands.append(
-                    Command(
-                        command=["python", "main.py"],
-                        timeout=command_timeout,
-                        stdin=stdin,
-                    )
-                )
-                if max_commands and len(commands) >= max_commands:
-                    break
-        else:
-            test_code = []
-            # Leetcode needs imports to be in the solution
-            prog = (
-                APPS_IMPORT_STR + "\n\n" + APPS_OUTPUT_CONVERTER + "\n\n" + sol
-            )
-
-            use_fn_name = input_output["fn_name"]
-            if "class Solution" in sol:
-                use_fn_name = "Solution()." + use_fn_name
-
-            for i, o in zip(input_output["inputs"], input_output["outputs"]):
-
-                test_code.append(make_test_case(use_fn_name, i, o))
-
-            files["main.py"] = prog + "\n\n" + "\n".join(test_code)
-            commands = [
-                Command(
-                    command=["python", "main.py"],
-                    timeout=timeout,
-                )
-            ]
+    for sol in problem["solutions"]:
         out.append(
-            Executable(
-                files=files,
-                commands=commands,
-                tracked_files=[],
-                ensure_all_run=False,
+            make_apps_executable(
+                solution=sol,
+                inputs=problem["inputs"],
+                outputs=problem["outputs"],
+                exec_mode=problem["exec_mode"],
+                timeout=timeout,
+                command_timeout=command_timeout,
+                max_commands=max_commands,
+                early_stopping=early_stopping,
             )
         )
     return out
@@ -128,28 +219,24 @@ def postprocessor(
     problem: Dict, result_list: List[ExecutionResult], max_commands: int = None
 ) -> Dict:
     out = []
-    uses_stdin = "fn_name" not in problem["input_output"]
+    if "exec_mode" not in problem:
+        input_output = ujson.loads(problem["input_output"])
+        uses_stdin = "fn_name" not in input_output
+        outputs = [o for o in input_output["outputs"]]
+        solutions = ujson.loads(problem["solutions"])
+    else:
+        uses_stdin = problem["exec_mode"] == "stdin"
+        outputs = problem["outputs"]
+        solutions = problem["solutions"]
     expected_out = None
     if uses_stdin:
-        expected_out = [o for o in problem["input_output"]["outputs"]]
+
+        expected_out = [o for o in outputs]
         if max_commands:
             expected_out = expected_out[:max_commands]
 
-    for res, pred in zip(result_list, problem["solutions"]):
-        if res.had_error or res.timed_out:
-            passed = False
-        elif uses_stdin:
-            if len(res.command_results) < len(expected_out):
-                passed = False
-            else:
-                actual = [
-                    r.stdout.replace("\r", "") for r in res.command_results
-                ]
-                passed = actual == expected_out
-
-        else:
-            passed = True
-
+    for res, pred in zip(result_list, solutions):
+        passed = did_pred_pass(res, uses_stdin, expected_out)
         out.append(
             {
                 "solution": pred,
@@ -166,22 +253,24 @@ def postprocessor(
 
     return {
         **{k: problem[k] for k in problem if k != "solutions"},
+        "expected_output": expected_out,
         "predictions": out,
     }
 
 
-def evaluate_apps(
-    dataset: Dataset,
+def evaluate(
+    predictions: List[Dict],
     num_workers: int,
     timeout: int = 10,
     command_timeout: float = 2.0,
     max_commands: int = None,
+    early_stopping: bool = False,
     k_vals: List[int] = None,
     execution_kwargs: Dict = None,
 ) -> Tuple[Dict, List[Dict]]:
 
     results = execute_predictions(
-        pred_list=dataset,
+        pred_list=predictions,
         config=ExecutionConfig(
             num_workers=num_workers, **(execution_kwargs or {})
         ),
@@ -190,8 +279,12 @@ def evaluate_apps(
             timeout=timeout,
             command_timeout=command_timeout,
             max_commands=max_commands,
+            early_stopping=early_stopping,
         ),
-        postprocessor=partial(postprocessor, max_commands=max_commands),
+        postprocessor=partial(
+            postprocessor,
+            max_commands=max_commands,
+        ),
         preproc_returns_list=True,
     )
 
@@ -201,7 +294,9 @@ def evaluate_apps(
         pass_counts.append(sum([p["passed"] for p in r["predictions"]]))
         num_samples = max(num_samples, len(r["predictions"]))
 
-    metrics = {}
+    metrics = {
+        "percent_passed": sum(pc > 0 for pc in pass_counts) / len(pass_counts),
+    }
     for k in k_vals or [1, 5, 10]:
         if k > num_samples:
             break

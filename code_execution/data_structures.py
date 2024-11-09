@@ -44,6 +44,11 @@ class CommandResult:
     timed_out: bool
     had_unexpected_error: bool = False
 
+    @property
+    def had_error(self) -> bool:
+        """Whether the last command had an error."""
+        return self.return_code != 0 or self.had_unexpected_error
+
 
 @dataclasses.dataclass(frozen=True)
 class ExecutionResult:
@@ -148,6 +153,12 @@ class Executable:
     should_early_stop: Callable[[int, CommandResult], bool] = (
         _default_should_early_stop
     )
+
+    def __post_init__(self):
+        if self.should_early_stop is None:
+            self.should_early_stop = _default_should_early_stop
+        elif not callable(self.should_early_stop):
+            raise ValueError("should_early_stop must be callable")
 
 
 @dataclasses.dataclass(frozen=True)

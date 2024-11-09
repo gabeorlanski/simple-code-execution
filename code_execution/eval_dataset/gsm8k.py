@@ -71,8 +71,8 @@ def postprocess(pred_dict: Dict, result: List[ExecutionResult]) -> Dict:
     }
 
 
-def evaluate_gsm8k(
-    dataset: Dataset,
+def evaluate(
+    predictions: List[Dict],
     num_workers: int,
     timeout: int = 10,
     entrypoint: int = "solution",
@@ -80,14 +80,13 @@ def evaluate_gsm8k(
     k_vals: List[int] = None,
 ) -> Tuple[Dict, List[Dict]]:
     logger.debug("Adding index column to dataset")
-    dataset = dataset.map(
-        lambda ex, idx: {"problem_id": idx, **ex}, with_indices=True
-    )
+    for idx in range(len(predictions)):
+        predictions[idx]["problem_id"] = idx
 
     logger.info("Evaluating GSM8K dataset")
 
     results = execute_predictions(
-        pred_list=dataset,
+        pred_list=predictions,
         config=ExecutionConfig(num_workers=num_workers),
         preprocessor=partial(
             preprocess,

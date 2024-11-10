@@ -15,7 +15,6 @@ logger = logging.getLogger(__name__)
 
 
 def make_executable(
-    idx: int,
     solution: Dict | List,
     answer: str,
     timeout: int = 10,
@@ -28,7 +27,7 @@ def make_executable(
         sol_str = solution
     else:
         raise TypeError(
-            f"Expected solution to be either a dict or a string, got {type(solution)} for idx={idx}"
+            f"Expected solution to be either a dict or a string, got {type(solution)}"
         )
     return Executable(
         files={"main.py": f"{sol_str}\n\nassert {entrypoint}() == {answer}"},
@@ -74,7 +73,6 @@ def preprocess(
                 timeout=timeout,
                 entrypoint=entrypoint,
                 solution_key=solution_key,
-                idx=_i,
             )
         )
 

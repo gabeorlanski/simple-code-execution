@@ -60,6 +60,10 @@ def preprocess(
         answer = pred_dict["answer"].split("####")[-1]
     elif "target" in pred_dict:
         answer = pred_dict["target"]
+    else:
+        raise ValueError(
+            "Expected 'answer' or 'target' key in the prediction dictionary"
+        )
     answer = answer.replace(",", "").replace("$", "").replace(" ", "")
     out = []
     for _i, solution in enumerate(pred_dict["solutions"]):

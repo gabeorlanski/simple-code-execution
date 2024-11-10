@@ -1,13 +1,15 @@
 """ Module for evaluating apps dataset. """
 
-import ujson
 import logging
 from functools import partial
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Optional, Tuple
+
+import ujson
 
 from code_execution.data_structures import Command
+from code_execution.data_structures import CommandResult
 from code_execution.data_structures import Executable
-from code_execution.data_structures import ExecutionResult, CommandResult
+from code_execution.data_structures import ExecutionResult
 from code_execution.entrypoints import execute_predictions
 from code_execution.eval_dataset.metrics import estimate_pass_at_k
 from code_execution.execution import ExecutionConfig

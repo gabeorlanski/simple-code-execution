@@ -23,7 +23,7 @@ def make_executable(
 ) -> Executable:
     if isinstance(solution, dict):
         sol_str = solution[solution_key]
-    elif isinstance(solution, list):
+    elif isinstance(solution, str):
         sol_str = solution
     else:
         raise TypeError(

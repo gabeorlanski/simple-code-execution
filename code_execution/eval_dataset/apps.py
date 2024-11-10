@@ -174,7 +174,7 @@ def make_apps_executable(
     )
 
 
-def did_pred_pass(
+def postprocess_program_result(
     command_result: ExecutionResult, uses_stdin: bool, expected_out: List[str]
 ) -> bool:
     if command_result.had_error or command_result.timed_out:
@@ -238,7 +238,7 @@ def postprocessor(
             expected_out = expected_out[:max_commands]
 
     for res, pred in zip(result_list, solutions):
-        passed = did_pred_pass(res, uses_stdin, expected_out)
+        passed = postprocess_program_result(res, uses_stdin, expected_out)
         out.append(
             {
                 "solution": pred,

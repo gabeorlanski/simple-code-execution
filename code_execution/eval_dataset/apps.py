@@ -175,18 +175,36 @@ def make_executable(
 
 
 def postprocess_program_result(
-    command_result: ExecutionResult, uses_stdin: bool, expected_out: List[str]
+    pred: Dict,
+    command_result: ExecutionResult,
+    uses_stdin: bool,
+    expected_out: List[str],
 ) -> bool:
     if command_result.had_error or command_result.timed_out:
-        return False
-    if uses_stdin:
+        passed = False
+    elif uses_stdin:
         if len(command_result.command_results) < len(expected_out):
-            return False
-        actual = [
+            passed = False
+        else:
+            actual = [
+                r.stdout.replace("\r", "")
+                for r in command_result.command_results
+            ]
+            passed = actual == expected_out
+    else:
+        passed = True
+
+    return {
+        **pred,
+        "passed": passed,
+        "return_code": command_result.last_cmd.return_code,
+        "stderr": [
+            r.stderr.replace("\r", "") for r in command_result.command_results
+        ],
+        "stdout": [
             r.stdout.replace("\r", "") for r in command_result.command_results
-        ]
-        return actual == expected_out
-    return True
+        ],
+    }
 
 
 def preprocessor(
@@ -238,19 +256,13 @@ def postprocessor(
             expected_out = expected_out[:max_commands]
 
     for res, pred in zip(result_list, solutions):
-        passed = postprocess_program_result(res, uses_stdin, expected_out)
         out.append(
-            {
-                "solution": pred,
-                "passed": passed,
-                "return_code": res.last_cmd.return_code,
-                "stderr": [
-                    r.stderr.replace("\r", "") for r in res.command_results
-                ],
-                "stdout": [
-                    r.stdout.replace("\r", "") for r in res.command_results
-                ],
-            }
+            postprocess_program_result(
+                command_result=res,
+                pred=pred,
+                uses_stdin=uses_stdin,
+                expected_out=expected_out,
+            )
         )
 
     return {

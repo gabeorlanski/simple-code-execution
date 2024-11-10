@@ -35,9 +35,13 @@ def make_executable(
     )
 
 
-def postprocess_program_result(pred: str, result: ExecutionResult) -> bool:
+def postprocess_program_result(
+    pred: Dict | str, result: ExecutionResult
+) -> bool:
+    if isinstance(pred, str):
+        pred = {"solution": pred}
     return {
-        "solution": pred,
+        **pred,
         "passed": not result.had_error and not result.timed_out,
         "return_code": result.last_cmd.return_code,
         "stderr": result.last_cmd.stderr,

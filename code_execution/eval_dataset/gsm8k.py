@@ -14,6 +14,38 @@ from code_execution.execution import ExecutionConfig
 logger = logging.getLogger(__name__)
 
 
+def make_executable(
+    idx: int,
+    solution: Dict | List,
+    answer: str,
+    timeout: int = 10,
+    entrypoint: str = "solution",
+    solution_key: str = "solution",
+) -> Executable:
+    if isinstance(solution, dict):
+        sol_str = solution[solution_key]
+    elif isinstance(solution, list):
+        sol_str = solution
+    else:
+        raise TypeError(
+            f"Expected solution to be either a dict or a string, got {type(solution)} for idx={idx}"
+        )
+    return Executable(
+        files={"main.py": f"{sol_str}\n\nassert {entrypoint}() == {answer}"},
+        commands=[Command(["python3", "main.py"], timeout=timeout)],
+    )
+
+
+def postprocess_program_result(pred: str, result: ExecutionResult) -> bool:
+    return {
+        "solution": pred,
+        "passed": not result.had_error and not result.timed_out,
+        "return_code": result.last_cmd.return_code,
+        "stderr": result.last_cmd.stderr,
+        "stdout": result.last_cmd.stdout,
+    }
+
+
 def preprocess(
     pred_dict: Dict,
     timeout: int = 10,
@@ -31,21 +63,14 @@ def preprocess(
     answer = answer.replace(",", "").replace("$", "").replace(" ", "")
     out = []
     for _i, solution in enumerate(pred_dict["solutions"]):
-        if isinstance(solution, dict):
-            sol_str = solution[solution_key]
-        elif isinstance(solution, list):
-            sol_str = solution
-        else:
-            raise TypeError(
-                f"Expected solution to be either a dict or a string, got {type(solution)} for idx={_i}"
-            )
-
         out.append(
-            Executable(
-                files={
-                    "main.py": f"{sol_str}\n\nassert {entrypoint}() == {answer}"
-                },
-                commands=[Command(["python3", "main.py"], timeout=timeout)],
+            make_executable(
+                solution=solution,
+                answer=answer,
+                timeout=timeout,
+                entrypoint=entrypoint,
+                solution_key=solution_key,
+                idx=_i,
             )
         )
 
@@ -55,15 +80,7 @@ def preprocess(
 def postprocess(pred_dict: Dict, result: List[ExecutionResult]) -> Dict:
     out = []
     for res, pred in zip(result, pred_dict["solutions"]):
-        out.append(
-            {
-                "solution": pred,
-                "passed": not res.had_error and not res.timed_out,
-                "return_code": res.last_cmd.return_code,
-                "stderr": res.last_cmd.stderr,
-                "stdout": res.last_cmd.stdout,
-            }
-        )
+        out.append(postprocess_program_result(pred=pred, result=res))
 
     return {
         **{k: pred_dict[k] for k in pred_dict if k != "solutions"},

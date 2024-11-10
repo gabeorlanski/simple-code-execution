@@ -121,7 +121,7 @@ def should_stop_early(
     return False
 
 
-def make_apps_executable(
+def make_executable(
     solution: str,
     inputs: List[List[str]],
     outputs: List[str],
@@ -203,7 +203,7 @@ def preprocessor(
 
     for sol in problem["solutions"]:
         out.append(
-            make_apps_executable(
+            make_executable(
                 solution=sol,
                 inputs=problem["inputs"],
                 outputs=problem["outputs"],

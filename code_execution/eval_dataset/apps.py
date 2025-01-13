@@ -9,10 +9,14 @@ import ujson
 from code_execution.data_structures import Command
 from code_execution.data_structures import CommandResult
 from code_execution.data_structures import Executable
-from code_execution.data_structures import ExecutionResult
+from code_execution.data_structures import (
+    ExecutionResult,
+    default_should_early_stop,
+)
 from code_execution.entrypoints import execute_predictions
 from code_execution.eval_dataset.metrics import estimate_pass_at_k
 from code_execution.execution import ExecutionConfig
+
 
 logger = logging.getLogger(__name__)
 
@@ -63,30 +67,35 @@ def make_test_case(fn_name, inputs, outputs):
     return f"assert convert_output({fn_name}({','.join(map(repr,inputs))})) == {expected_out}"
 
 
-def process_raw_example(example):
+def process_raw_example(example, solution_col: str = "solutions"):
     try:
         input_output = ujson.loads(example["input_output"])
     except (ujson.JSONDecodeError, ValueError):
         input_output = {"inputs": [], "outputs": []}
 
     try:
-        solutions = ujson.loads(example["solutions"])
+        solutions = ujson.loads(example[solution_col])
     except ujson.JSONDecodeError:
         solutions = []
 
     # check if the solution is a class, so we can call the function Solution.fn_name
-    is_cls = any("class Solution" in s for s in solutions)
 
+    use_fn_name = None
+    if "fn_name" in input_output:
+
+        is_cls = sum("class Solution" in s for s in solutions)
+        if is_cls / len(solutions) > 0.5:
+
+            use_fn_name = "Solution()." + input_output["fn_name"]
+        else:
+            use_fn_name = input_output["fn_name"]
     # convert these to strings for pyarrow
     new_inputs = []
     new_outputs = []
+
     for inp, out in zip(input_output["inputs"], input_output["outputs"]):
 
-        if "fn_name" in input_output:
-            if is_cls:
-                use_fn_name = "Solution()." + input_output["fn_name"]
-            else:
-                use_fn_name = input_output["fn_name"]
+        if use_fn_name:
             new_inputs.append([make_test_case(use_fn_name, inp, out)])
         elif isinstance(inp, list):
             new_inputs.append(inp)
@@ -101,6 +110,7 @@ def process_raw_example(example):
         "outputs": new_outputs,
         "solutions": solutions,
         "exec_mode": "asserts" if "fn_name" in input_output else "stdin",
+        "fn_name": use_fn_name,
     }
 
 
@@ -122,7 +132,7 @@ def should_stop_early(
 
 
 def make_executable(
-    solution: str,
+    solution: str | Dict,
     inputs: List[List[str]],
     outputs: List[str],
     exec_mode: str,
@@ -130,8 +140,13 @@ def make_executable(
     command_timeout: float = 2.0,
     max_commands: int = None,
     early_stopping: bool = False,
+    solution_str_key: str = "solution",
 ) -> List[Executable]:
-    files = {"main.py": solution}
+    if isinstance(solution, dict):
+        solution_str = solution[solution_str_key]
+    else:
+        solution_str = solution
+    files = {"main.py": solution_str}
     if exec_mode == "stdin":
         commands = []
         for i in inputs:
@@ -147,7 +162,11 @@ def make_executable(
     elif exec_mode == "asserts":
         # Leetcode needs imports to be in the solution
         prog = (
-            APPS_IMPORT_STR + "\n\n" + APPS_OUTPUT_CONVERTER + "\n\n" + solution
+            APPS_IMPORT_STR
+            + "\n\n"
+            + APPS_OUTPUT_CONVERTER
+            + "\n\n"
+            + solution_str
         )
         files["main.py"] = prog + "\n\n" + "\n".join(inputs[0])
         commands = [
@@ -158,13 +177,14 @@ def make_executable(
         ]
     else:
         raise ValueError(f"Unknown exec_mode: {exec_mode}")
-    early_stop_fn = None
     if early_stopping:
         early_stop_fn = partial(
             should_stop_early,
             expected_out=outputs,
             is_stdin=exec_mode == "stdin",
         )
+    else:
+        early_stop_fn = default_should_early_stop
     return Executable(
         files=files,
         commands=commands,
@@ -175,11 +195,10 @@ def make_executable(
 
 
 def postprocess_program_result(
-    pred: Dict,
     command_result: ExecutionResult,
     uses_stdin: bool,
     expected_out: List[str],
-) -> bool:
+) -> Dict:
     if command_result.had_error or command_result.timed_out:
         passed = False
     elif uses_stdin:
@@ -193,9 +212,7 @@ def postprocess_program_result(
             passed = actual == expected_out
     else:
         passed = True
-
     return {
-        **pred,
         "passed": passed,
         "return_code": command_result.last_cmd.return_code,
         "stderr": [
@@ -213,13 +230,15 @@ def preprocessor(
     command_timeout: float = 2.0,
     max_commands: int = None,
     early_stopping: bool = False,
+    solution_str_key: str = "solution",
+    solution_list_key: str = "solutions",
 ) -> Executable:
     out = []
 
     if "exec_mode" not in problem:
         problem = process_raw_example(problem)
 
-    for sol in problem["solutions"]:
+    for sol in problem[solution_list_key]:
         out.append(
             make_executable(
                 solution=sol,
@@ -230,6 +249,7 @@ def preprocessor(
                 command_timeout=command_timeout,
                 max_commands=max_commands,
                 early_stopping=early_stopping,
+                solution_str_key=solution_str_key,
             )
         )
     return out
@@ -254,16 +274,13 @@ def postprocessor(
         expected_out = [o for o in outputs]
         if max_commands:
             expected_out = expected_out[:max_commands]
-
     for res, pred in zip(result_list, solutions):
-        out.append(
-            postprocess_program_result(
-                command_result=res,
-                pred=pred,
-                uses_stdin=uses_stdin,
-                expected_out=expected_out,
-            )
+        proc_res = postprocess_program_result(
+            command_result=res,
+            uses_stdin=uses_stdin,
+            expected_out=expected_out,
         )
+        out.append({"prediction": pred, **proc_res})
 
     return {
         **{k: problem[k] for k in problem if k != "solutions"},
@@ -281,6 +298,8 @@ def evaluate(
     early_stopping: bool = False,
     k_vals: List[int] = None,
     execution_kwargs: Dict = None,
+    solution_str_key: str = "solution",
+    solution_list_key: str = "solutions",
 ) -> Tuple[Dict, List[Dict]]:
 
     results = execute_predictions(
@@ -294,6 +313,8 @@ def evaluate(
             command_timeout=command_timeout,
             max_commands=max_commands,
             early_stopping=early_stopping,
+            solution_str_key=solution_str_key,
+            solution_list_key=solution_list_key,
         ),
         postprocessor=partial(
             postprocessor,

@@ -128,7 +128,7 @@ class ExecutionResult:
         )
 
 
-def _default_should_early_stop(*_, **_k) -> bool:
+def default_should_early_stop(*_, **_k) -> bool:
     _ = _k
     return False
 
@@ -151,13 +151,11 @@ class Executable:
     tracked_files: List[str] = dataclasses.field(default_factory=list)
     ensure_all_run: bool = False
     should_early_stop: Callable[[int, CommandResult], bool] = (
-        _default_should_early_stop
+        default_should_early_stop
     )
 
     def __post_init__(self):
-        if self.should_early_stop is None:
-            self.should_early_stop = _default_should_early_stop
-        elif not callable(self.should_early_stop):
+        if not callable(self.should_early_stop):
             raise ValueError("should_early_stop must be callable")
 
 
@@ -181,5 +179,5 @@ class CommandsToRun:
     tracked_files: List[str] = dataclasses.field(default_factory=list)
     ensure_all_run: bool = False
     should_early_stop: Callable[[int, CommandResult], bool] = (
-        _default_should_early_stop
+        default_should_early_stop
     )

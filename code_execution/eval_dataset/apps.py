@@ -19,7 +19,7 @@ from code_execution.execution import ExecutionConfig
 
 
 logger = logging.getLogger(__name__)
-
+NO_FN_NAME = "__NO_FN_NAME__"
 APPS_IMPORT_STR = """import sys
 import time
 import itertools
@@ -80,7 +80,7 @@ def process_raw_example(example, solution_col: str = "solutions"):
 
     # check if the solution is a class, so we can call the function Solution.fn_name
 
-    use_fn_name = None
+    use_fn_name = NO_FN_NAME
     if "fn_name" in input_output:
 
         is_cls = sum("class Solution" in s for s in solutions)
@@ -95,7 +95,7 @@ def process_raw_example(example, solution_col: str = "solutions"):
 
     for inp, out in zip(input_output["inputs"], input_output["outputs"]):
 
-        if use_fn_name:
+        if use_fn_name != NO_FN_NAME:
             new_inputs.append([make_test_case(use_fn_name, inp, out)])
         elif isinstance(inp, list):
             new_inputs.append(inp)
@@ -109,7 +109,7 @@ def process_raw_example(example, solution_col: str = "solutions"):
         "inputs": new_inputs,
         "outputs": new_outputs,
         "solutions": solutions,
-        "exec_mode": "asserts" if "fn_name" in input_output else "stdin",
+        "exec_mode": "asserts" if use_fn_name != NO_FN_NAME else "stdin",
         "fn_name": use_fn_name,
     }
 

@@ -54,6 +54,7 @@ def preprocess(
     timeout: int = 10,
     entrypoint: str = "solution",
     solution_key: str = "solution",
+    solution_list_key: str = "solutions",
 ) -> Executable:
     """Preprocesses the GSM8K prediction into an executable. Expected keys in the pred_dict are:
     - "answer" or "target": the expected output
@@ -69,7 +70,7 @@ def preprocess(
         )
     answer = answer.replace(",", "").replace("$", "").replace(" ", "")
     out = []
-    for _i, solution in enumerate(pred_dict["solutions"]):
+    for _i, solution in enumerate(pred_dict[solution_list_key]):
         out.append(
             make_executable(
                 solution=solution,
@@ -83,13 +84,17 @@ def preprocess(
     return out
 
 
-def postprocess(pred_dict: Dict, result: List[ExecutionResult]) -> Dict:
+def postprocess(
+    pred_dict: Dict,
+    result: List[ExecutionResult],
+    solution_list_key: str = "solution",
+) -> Dict:
     out = []
-    for res, pred in zip(result, pred_dict["solutions"]):
+    for res, pred in zip(result, pred_dict[solution_list_key]):
         out.append(postprocess_program_result(pred=pred, result=res))
 
     return {
-        **{k: pred_dict[k] for k in pred_dict if k != "solutions"},
+        **{k: pred_dict[k] for k in pred_dict if k != solution_list_key},
         "predictions": out,
     }
 
@@ -100,6 +105,7 @@ def evaluate(
     timeout: int = 10,
     entrypoint: int = "solution",
     solution_key: str = "solution",
+    solution_list_key: str = "solutions",
     k_vals: List[int] = None,
 ) -> Tuple[Dict, List[Dict]]:
     logger.debug("Adding index column to dataset")
@@ -116,8 +122,9 @@ def evaluate(
             timeout=timeout,
             entrypoint=entrypoint,
             solution_key=solution_key,
+            solution_list_key=solution_list_key,
         ),
-        postprocessor=postprocess,
+        postprocessor=partial(postprocess, solution_list_key=solution_list_key),
         preproc_returns_list=True,
     )
 

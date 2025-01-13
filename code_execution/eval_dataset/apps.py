@@ -213,6 +213,8 @@ def postprocess_program_result(
     else:
         passed = True
     return {
+        "timed_out": command_result.timed_out,
+        "had_error": command_result.had_error,
         "passed": passed,
         "return_code": command_result.last_cmd.return_code,
         "stderr": [
@@ -256,18 +258,22 @@ def preprocessor(
 
 
 def postprocessor(
-    problem: Dict, result_list: List[ExecutionResult], max_commands: int = None
+    problem: Dict,
+    result_list: List[ExecutionResult],
+    max_commands: int = None,
+    solution_str_key: str = "solution",
+    solution_list_key: str = "solutions",
 ) -> Dict:
     out = []
     if "exec_mode" not in problem:
         input_output = ujson.loads(problem["input_output"])
         uses_stdin = "fn_name" not in input_output
         outputs = [o for o in input_output["outputs"]]
-        solutions = ujson.loads(problem["solutions"])
+        solutions = ujson.loads(problem[solution_list_key])
     else:
         uses_stdin = problem["exec_mode"] == "stdin"
         outputs = problem["outputs"]
-        solutions = problem["solutions"]
+        solutions = problem[solution_list_key]
     expected_out = None
     if uses_stdin:
 
@@ -280,10 +286,12 @@ def postprocessor(
             uses_stdin=uses_stdin,
             expected_out=expected_out,
         )
-        out.append({"prediction": pred, **proc_res})
+        if isinstance(pred, str):
+            pred = {solution_str_key: pred}
+        out.append({**pred, **proc_res})
 
     return {
-        **{k: problem[k] for k in problem if k != "solutions"},
+        **{k: problem[k] for k in problem if k != solution_list_key},
         "expected_output": expected_out,
         "predictions": out,
     }
@@ -319,6 +327,8 @@ def evaluate(
         postprocessor=partial(
             postprocessor,
             max_commands=max_commands,
+            solution_list_key=solution_list_key,
+            solution_str_key=solution_str_key,
         ),
         preproc_returns_list=True,
     )

@@ -384,3 +384,34 @@ def configure_logging(
         datefmt = "%Y-%m-%d %H:%M:%S"
     console = logging.StreamHandler()
     console.setFormatter(logging.Formatter(format, datefmt=datefmt))
+
+
+MEM_MAX_CODE = """__MAX_MEM = %%MEM_LIMIT%%
+def _set_mem_limit():
+    import resource
+    import platform
+    resource.setrlimit(
+        resource.RLIMIT_AS, (__MAX_MEM, __MAX_MEM)
+    )
+    resource.setrlimit(
+        resource.RLIMIT_DATA, (__MAX_MEM, __MAX_MEM)
+    )
+    if not platform.uname().system == "Darwin":
+        resource.setrlimit(
+            resource.RLIMIT_STACK, (__MAX_MEM, __MAX_MEM)
+        )
+
+_set_mem_limit()
+"""
+
+
+def get_mem_limit_code(mem_limit: str) -> str:
+    """Gets the code to set the memory limit.
+
+    Args:
+        mem_limit (str): The memory limit value as a string. You can do something like "4 * 1024" or "1024".
+
+    Returns:
+        str: The code to set the memory limit.
+    """
+    return MEM_MAX_CODE.replace("%%MEM_LIMIT%%", mem_limit)

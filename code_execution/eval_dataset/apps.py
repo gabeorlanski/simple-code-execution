@@ -2,7 +2,7 @@
 
 import logging
 from functools import partial
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 import ujson
 
@@ -16,7 +16,7 @@ from code_execution.data_structures import (
 from code_execution.entrypoints import execute_predictions
 from code_execution.eval_dataset.metrics import estimate_pass_at_k
 from code_execution.execution import ExecutionConfig
-
+from code_execution.utils import get_mem_limit_code
 
 logger = logging.getLogger(__name__)
 NO_FN_NAME = "__NO_FN_NAME__"
@@ -46,7 +46,6 @@ APPS_FIXES = {
         ]
     }
 }
-
 
 APPS_OUTPUT_CONVERTER = """def convert_output(output):
     if isinstance(output,tuple):
@@ -141,6 +140,7 @@ def make_executable(
     max_commands: int = None,
     early_stopping: bool = False,
     solution_str_key: str = "solution",
+    max_memory: str = "4*1024*1024*1024",
 ) -> List[Executable]:
     if isinstance(solution, dict):
         solution_str = solution[solution_str_key]
@@ -185,6 +185,8 @@ def make_executable(
         )
     else:
         early_stop_fn = default_should_early_stop
+    files["main.py"] = get_mem_limit_code(max_memory) + files["main.py"]
+
     return Executable(
         files=files,
         commands=commands,
@@ -234,6 +236,7 @@ def preprocessor(
     early_stopping: bool = False,
     solution_str_key: str = "solution",
     solution_list_key: str = "solutions",
+    max_memory: str = "4*1024*1024*1024",
 ) -> Executable:
     out = []
 
@@ -252,6 +255,7 @@ def preprocessor(
                 max_commands=max_commands,
                 early_stopping=early_stopping,
                 solution_str_key=solution_str_key,
+                max_memory=max_memory,
             )
         )
     return out
@@ -308,6 +312,7 @@ def evaluate(
     execution_kwargs: Dict = None,
     solution_str_key: str = "solution",
     solution_list_key: str = "solutions",
+    max_memory: str = "4*1024*1024*1024",
 ) -> Tuple[Dict, List[Dict]]:
 
     results = execute_predictions(
@@ -323,6 +328,7 @@ def evaluate(
             early_stopping=early_stopping,
             solution_str_key=solution_str_key,
             solution_list_key=solution_list_key,
+            max_memory=max_memory,
         ),
         postprocessor=partial(
             postprocessor,

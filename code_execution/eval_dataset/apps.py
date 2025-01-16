@@ -66,7 +66,7 @@ def make_test_case(fn_name, inputs, outputs):
     return f"assert convert_output({fn_name}({','.join(map(repr,inputs))})) == {expected_out}"
 
 
-def process_raw_example(example, solution_col: str = "solutions"):
+def process_raw_example(example, solution_col: str = "solutions", asserts_as_list: bool = False):
     try:
         input_output = ujson.loads(example["input_output"])
     except (ujson.JSONDecodeError, ValueError):
@@ -95,7 +95,13 @@ def process_raw_example(example, solution_col: str = "solutions"):
     for inp, out in zip(input_output["inputs"], input_output["outputs"]):
 
         if use_fn_name != NO_FN_NAME:
-            new_inputs.append([make_test_case(use_fn_name, inp, out)])
+            test_case = make_test_case(use_fn_name, inp, out)
+            
+            # This is because pyarrow datasets will throw a fit.
+            if asserts_as_list:
+                new_inputs.append([test_case])
+            else:
+                new_inputs.append(test_case)
         elif isinstance(inp, list):
             new_inputs.append(inp)
             new_outputs.append("\n".join(out))
@@ -168,7 +174,12 @@ def make_executable(
             + "\n\n"
             + solution_str
         )
-        files["main.py"] = prog + "\n\n" + "\n".join(inputs[0])
+        
+        test_cases = inputs
+        if isinstance(inputs[0], list):
+            test_cases =  [tc for i in inputs for tc in i]
+        
+        files["main.py"] = prog + "\n\n" + "\n".join(test_cases)
         commands = [
             Command(
                 command=["python", "main.py"],

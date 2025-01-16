@@ -15,7 +15,7 @@ def safe_ast_parse(code) -> ast.Module:
     try:
         with time_limit(5):
             res = ast.parse(code)
-    except (SyntaxError, ValueError, RecursionError, ContextTimeLimitException):
+    except (SyntaxError, ValueError, RecursionError, ContextTimeLimitException, MemoryError):
         return None
     return res
 

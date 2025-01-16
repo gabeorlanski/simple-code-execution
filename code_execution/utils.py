@@ -390,6 +390,9 @@ MEM_MAX_CODE = """__MAX_MEM = %%MEM_LIMIT%%
 def _set_mem_limit():
     import resource
     import platform
+
+    if not __MAX_MEM:
+        return
     resource.setrlimit(
         resource.RLIMIT_AS, (__MAX_MEM, __MAX_MEM)
     )

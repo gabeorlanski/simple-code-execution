@@ -59,12 +59,14 @@ class ExecutionResult:
         elapsed: The elapsed time.
         cwd: The current working directory.
         tracked_files: The tracked files.
+        expected_num_commands: The expected number of commands ran.
     """
 
     command_results: List[CommandResult]
     elapsed: float
     cwd: str
     tracked_files: Dict[str, str]
+    expected_num_commands: int
 
     @property
     def timed_out(self) -> bool:
@@ -86,6 +88,10 @@ class ExecutionResult:
         if not self.command_results:
             return None
         return self.command_results[-1]
+
+    def all_had_return_code(self, return_code: int) -> bool:
+        """Whether all commands had the same return code."""
+        return all(r.return_code == return_code for r in self.command_results)
 
     def to_dict(self) -> Dict:
         """Converts the result to a dictionary."""
@@ -125,6 +131,7 @@ class ExecutionResult:
             elapsed=elapsed,
             cwd=None,
             tracked_files={},
+            expected_num_commands=num_commands,
         )
 
 

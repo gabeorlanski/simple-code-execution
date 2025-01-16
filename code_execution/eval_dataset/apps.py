@@ -2,7 +2,7 @@
 
 import logging
 from functools import partial
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 
 import ujson
 
@@ -57,6 +57,20 @@ APPS_OUTPUT_CONVERTER = """def convert_output(output):
         pass
     return output"""
 
+APPS_ASSERT_IF_TEMPLATE = """import argparse
+_ARG_PARSER_ = argparse.ArgumentParser()
+_ARG_PARSER_.add_argument('test_id', type=int)
+__ARGS__= _ARG_PARSER_.parse_args()
+
+%%%TEST_IFS%%%
+else:
+    raise ValueError(f"Unknown test_id: {__ARGS__.test_id}")
+print(f"Passed test: {__ARGS__.test_id}")"""
+
+
+APPS_IF_BRANCH = """if __ARGS__.test_id == %%%test_id%%%:
+    %%%test_case%%%"""
+
 
 def make_test_case(fn_name, inputs, outputs):
     if isinstance(outputs, list) and len(outputs) == 1:
@@ -66,7 +80,16 @@ def make_test_case(fn_name, inputs, outputs):
     return f"assert convert_output({fn_name}({','.join(map(repr,inputs))})) == {expected_out}"
 
 
-def process_raw_example(example, solution_col: str = "solutions", asserts_as_list: bool = False):
+def process_raw_example(
+    example, solution_col: str = "solutions", asserts_as_list: bool = True
+):
+    """Processes a raw example from the APPs dataset.
+
+    Converts the input_output strings and solutions string to lists of inputs and outputs.
+
+    For asserts style problems, it will also determine if the solution is a class or not. It will also populate the inputs field with the formatted test cases.
+
+    """
     try:
         input_output = ujson.loads(example["input_output"])
     except (ujson.JSONDecodeError, ValueError):
@@ -96,7 +119,7 @@ def process_raw_example(example, solution_col: str = "solutions", asserts_as_lis
 
         if use_fn_name != NO_FN_NAME:
             test_case = make_test_case(use_fn_name, inp, out)
-            
+
             # This is because pyarrow datasets will throw a fit.
             if asserts_as_list:
                 new_inputs.append([test_case])
@@ -122,11 +145,16 @@ def process_raw_example(example, solution_col: str = "solutions", asserts_as_lis
 def should_stop_early(
     cmd_idx: int, res: CommandResult, is_stdin: bool, expected_out: List[str]
 ) -> bool:
+    """Determines if we should stop execution early."""
+
     if res.had_error or res.timed_out:
         return True
 
+    # The program is an assertion style, so if there is no error there is no
+    # reason to stop early.
     if not is_stdin:
         return False
+
     if len(expected_out) <= cmd_idx:
         return True
 
@@ -141,13 +169,33 @@ def make_executable(
     inputs: List[List[str]],
     outputs: List[str],
     exec_mode: str,
-    timeout: int = 10,
+    first_command_timeout: Optional[float] = None,
     command_timeout: float = 2.0,
     max_commands: int = None,
     early_stopping: bool = False,
     solution_str_key: str = "solution",
     max_memory: str = "4*1024*1024*1024",
-) -> List[Executable]:
+) -> Executable:
+    """Makes the executable for an APPS problem.
+
+    If the program is an assertion based program, it will add each test case as
+    an if statment and expects a command line argument of the test idx to run.
+
+    Args:
+        solution (str | Dict): The solution code.
+        inputs (List[List[str]]): The inputs to the program.
+        outputs (List[str]): The expected outputs if the problem is stdin based.
+        exec_mode (str): The type of execution for the program. Either "stdin" or "asserts".
+        first_command_timeout (Optional[float], optional): _description_. Defaults to None.
+        command_timeout (float, optional): The individual command timeout. Defaults to 2.0.
+        max_commands (int, optional): The maximum commands to run. Defaults to None.
+        early_stopping (bool, optional): Stop on the first incorrect output. Defaults to False.
+        solution_str_key (str, optional): The key in the solution dict where the raw code is. Defaults to "solution".
+        max_memory (str, optional): Max memory to use. Defaults to "4*1024*1024*1024".
+
+    Returns:
+        Executable: The executable for the problem + solution.
+    """
     if isinstance(solution, dict):
         solution_str = solution[solution_str_key]
     else:
@@ -156,10 +204,14 @@ def make_executable(
     if exec_mode == "stdin":
         commands = []
         for i in inputs:
+            use_timeout = command_timeout
+            if first_command_timeout is not None and not commands:
+                use_timeout = first_command_timeout
+
             commands.append(
                 Command(
-                    command=["python", "main.py"],
-                    timeout=command_timeout,
+                    command=["python3", "main.py"],
+                    timeout=use_timeout,
                     stdin=i,
                 )
             )
@@ -174,18 +226,40 @@ def make_executable(
             + "\n\n"
             + solution_str
         )
-        
-        test_cases = inputs
-        if isinstance(inputs[0], list):
-            test_cases =  [tc for i in inputs for tc in i]
-        
-        files["main.py"] = prog + "\n\n" + "\n".join(test_cases)
-        commands = [
-            Command(
-                command=["python", "main.py"],
-                timeout=timeout,
-            )
-        ]
+
+        test_cases = []
+        commands = []
+        for tc_l in inputs:
+            if isinstance(tc_l, str):
+                tc_l = [tc_l]
+
+            for tc in tc_l:
+                test_idx = len(test_cases) + 1
+
+                use_timeout = command_timeout
+                if first_command_timeout is not None and not commands:
+                    use_timeout = first_command_timeout
+                commands.append(
+                    Command(
+                        command=["python3", "main.py", str(test_idx)],
+                        timeout=use_timeout,
+                    )
+                )
+                tc = APPS_IF_BRANCH.replace(
+                    "%%%test_id%%%", str(test_idx)
+                ).replace("%%%test_case%%%", tc)
+                if test_idx != 1:
+                    tc = "el" + tc
+                test_cases.append(tc)
+
+            if max_commands and len(commands) >= max_commands:
+                break
+
+        test_cases = APPS_ASSERT_IF_TEMPLATE.replace(
+            "%%%TEST_IFS%%%", "\n".join(test_cases)
+        )
+        files["main.py"] = prog + "\n\n" + test_cases
+
     else:
         raise ValueError(f"Unknown exec_mode: {exec_mode}")
     if early_stopping:
@@ -211,20 +285,34 @@ def postprocess_program_result(
     command_result: ExecutionResult,
     uses_stdin: bool,
     expected_out: List[str],
+    expected_num_commands: int,
 ) -> Dict:
-    if command_result.had_error or command_result.timed_out:
+    """Processes the result of executing a program for APPs.
+
+    Returns a dict with the following keys:
+    - timed_out: Whether the program timed out.
+    - had_error: Whether the program had an error.
+    - passed: Whether the program passed.
+    - return_code: The return code of the program.
+    - stderr: The stderr of the program.
+    - stdout: The stdout of the program.
+    """
+    if command_result.timed_out or not command_result.command_results:
         passed = False
-    elif uses_stdin:
-        if len(command_result.command_results) < len(expected_out):
-            passed = False
-        else:
+    elif not command_result.all_had_return_code(0):
+        passed = False
+    elif len(command_result.command_results) < expected_num_commands:
+        passed = False
+    else:
+        if uses_stdin:
+
             actual = [
                 r.stdout.replace("\r", "")
                 for r in command_result.command_results
             ]
             passed = actual == expected_out
-    else:
-        passed = True
+        else:
+            passed = True
     return {
         "timed_out": command_result.timed_out,
         "had_error": command_result.had_error,
@@ -241,8 +329,8 @@ def postprocess_program_result(
 
 def preprocessor(
     problem,
-    timeout: int = 10,
     command_timeout: float = 2.0,
+    first_command_timeout: Optional[float] = None,
     max_commands: int = None,
     early_stopping: bool = False,
     solution_str_key: str = "solution",
@@ -261,12 +349,12 @@ def preprocessor(
                 inputs=problem["inputs"],
                 outputs=problem["outputs"],
                 exec_mode=problem["exec_mode"],
-                timeout=timeout,
                 command_timeout=command_timeout,
                 max_commands=max_commands,
                 early_stopping=early_stopping,
                 solution_str_key=solution_str_key,
                 max_memory=max_memory,
+                first_command_timeout=first_command_timeout,
             )
         )
     return out
@@ -300,6 +388,7 @@ def postprocessor(
             command_result=res,
             uses_stdin=uses_stdin,
             expected_out=expected_out,
+            expected_num_commands=res.expected_num_commands,
         )
         if isinstance(pred, str):
             pred = {solution_str_key: pred}
@@ -333,7 +422,7 @@ def evaluate(
         ),
         preprocessor=partial(
             preprocessor,
-            timeout=timeout,
+            first_command_timeout=timeout,
             command_timeout=command_timeout,
             max_commands=max_commands,
             early_stopping=early_stopping,

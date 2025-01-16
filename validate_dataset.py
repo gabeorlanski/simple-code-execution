@@ -65,9 +65,7 @@ def main(flags):
             }
         )
 
-        dataset = dataset.filter(
-            lambda x: len(x["solutions"]) > 0 and len(x["inputs"]) > 0
-        )
+        dataset = dataset.filter(lambda x: len(x["inputs"]) > 0)
         if flags.sol_per:
             dataset = dataset.map(
                 lambda x: {
@@ -79,11 +77,11 @@ def main(flags):
         metrics, results = evaluate_apps(
             dataset.to_list(),
             num_workers=flags.num_workers,
-            timeout=4,
+            timeout=10.0,
             execution_kwargs={"log_freq": 10},
             command_timeout=3.0,
             early_stopping=True,
-            max_commands=3,
+            max_memory="None",
         )
 
     out_path = Path("scratch")
@@ -95,6 +93,8 @@ def main(flags):
                     f.write(
                         json.dumps({"problem": r["problem_id"], **p}) + "\n"
                     )
+                else:
+                    print(r["problem_id"], p["passed"])
 
     print(json.dumps(metrics, indent=2))
 

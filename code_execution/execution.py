@@ -1,7 +1,6 @@
 """ Module for executing code. """
 
 import concurrent.futures
-import dataclasses
 import functools
 import logging
 import math
@@ -155,6 +154,7 @@ def serial_execute_code(sample: CommandsToRun) -> ExecutionResult:
     results = []
     t0 = time.time()
     for cidx, command in enumerate(sample.commands):
+        command: Command
         res = safe_execute(
             command.command,
             working_dir=working_dir_for_execution,
@@ -186,6 +186,7 @@ def serial_execute_code(sample: CommandsToRun) -> ExecutionResult:
         elapsed=elapsed,
         cwd=str(working_dir_for_execution),
         tracked_files=file_contents,
+        expected_num_commands=len(sample.commands),
     )
 
 

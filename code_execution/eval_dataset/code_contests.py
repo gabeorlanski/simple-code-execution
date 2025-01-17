@@ -431,8 +431,8 @@ def evaluate(
     num_samples = 1
     pass_counts = []
     for r in results:
-        pass_counts.append(sum([p["passed"] for p in r[solution_list_key]]))
-        num_samples = max(num_samples, len(r[solution_list_key]))
+        pass_counts.append(sum([p["passed"] for p in r["predictions"]]))
+        num_samples = max(num_samples, len(r["predictions"]))
 
     metrics = {
         "percent_passed": sum(pc > 0 for pc in pass_counts) / len(pass_counts),

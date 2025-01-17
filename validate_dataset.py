@@ -143,7 +143,7 @@ def main(flags):
     out_path.mkdir(exist_ok=True)
     with open(out_path / "failed.jsonl", "w") as f:
         for r in results:
-            for p in r["predictions"]:
+            for p in r["predictions" if "predictions" in r else "solutions"]:
                 if not p["passed"]:
                     f.write(
                         json.dumps({"problem": r["problem_id"], **p}) + "\n"

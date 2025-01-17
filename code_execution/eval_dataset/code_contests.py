@@ -368,7 +368,7 @@ def postprocess(
 
     return {
         **problem,
-        solution_list_key: out,
+        "predictions": out,
     }
 
 

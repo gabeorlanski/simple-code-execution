@@ -2,18 +2,17 @@
 
 import logging
 from functools import partial
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Optional, Tuple
 
 import ujson
 
 from code_execution.data_structures import Command
 from code_execution.data_structures import CommandResult
 from code_execution.data_structures import Executable
-from code_execution.data_structures import (
-    ExecutionResult,
-    default_should_early_stop,
-)
+from code_execution.data_structures import ExecutionResult
+from code_execution.data_structures import default_should_early_stop
 from code_execution.entrypoints import execute_predictions
+from code_execution.eval_dataset import eval_utils
 from code_execution.eval_dataset.metrics import estimate_pass_at_k
 from code_execution.execution import ExecutionConfig
 from code_execution.utils import get_mem_limit_code
@@ -179,7 +178,7 @@ def make_executable(
     """Makes the executable for an APPS problem.
 
     If the program is an assertion based program, it will add each test case as
-    an if statment and expects a command line argument of the test idx to run.
+    an if statement and expects a command line argument of the test idx to run.
 
     Args:
         solution (str | Dict): The solution code.
@@ -200,68 +199,15 @@ def make_executable(
         solution_str = solution[solution_str_key]
     else:
         solution_str = solution
-    files = {"main.py": solution_str}
-    if exec_mode == "stdin":
-        commands = []
-        for i in inputs:
-            use_timeout = command_timeout
-            if first_command_timeout is not None and not commands:
-                use_timeout = first_command_timeout
 
-            commands.append(
-                Command(
-                    command=["python3", "main.py"],
-                    timeout=use_timeout,
-                    stdin=i,
-                )
-            )
-            if max_commands and len(commands) >= max_commands:
-                break
-    elif exec_mode == "asserts":
-        # Leetcode needs imports to be in the solution
-        prog = (
+    if exec_mode == "asserts":
+        solution_str = (
             APPS_IMPORT_STR
             + "\n\n"
             + APPS_OUTPUT_CONVERTER
             + "\n\n"
             + solution_str
         )
-
-        test_cases = []
-        commands = []
-        for tc_l in inputs:
-            if isinstance(tc_l, str):
-                tc_l = [tc_l]
-
-            for tc in tc_l:
-                test_idx = len(test_cases) + 1
-
-                use_timeout = command_timeout
-                if first_command_timeout is not None and not commands:
-                    use_timeout = first_command_timeout
-                commands.append(
-                    Command(
-                        command=["python3", "main.py", str(test_idx)],
-                        timeout=use_timeout,
-                    )
-                )
-                tc = APPS_IF_BRANCH.replace(
-                    "%%%test_id%%%", str(test_idx)
-                ).replace("%%%test_case%%%", tc)
-                if test_idx != 1:
-                    tc = "el" + tc
-                test_cases.append(tc)
-
-            if max_commands and len(commands) >= max_commands:
-                break
-
-        test_cases = APPS_ASSERT_IF_TEMPLATE.replace(
-            "%%%TEST_IFS%%%", "\n".join(test_cases)
-        )
-        files["main.py"] = prog + "\n\n" + test_cases
-
-    else:
-        raise ValueError(f"Unknown exec_mode: {exec_mode}")
     if early_stopping:
         early_stop_fn = partial(
             should_stop_early,
@@ -270,7 +216,60 @@ def make_executable(
         )
     else:
         early_stop_fn = default_should_early_stop
-    files["main.py"] = get_mem_limit_code(max_memory) + files["main.py"]
+    solution_str = (
+        get_mem_limit_code(max_memory, trailing="\n\n") + solution_str
+    )
+    files = {"main.py": solution_str}
+    if exec_mode == "stdin":
+        if max_commands:
+            inputs = inputs[:max_commands]
+
+        return eval_utils.make_stdin_executable(
+            files=files,
+            inputs=inputs,
+            commands=["python3", "main.py"],
+            early_stop_fn=early_stop_fn,
+            first_command_timeout=first_command_timeout,
+            command_timeout=command_timeout,
+        )
+
+    # If it reaches this point it must be asserts.
+    if exec_mode != "asserts":
+        raise ValueError(f"Unknown exec_mode: {exec_mode}")
+
+    # Leetcode needs imports to be in the solution
+    test_cases = []
+    commands = []
+    for tc_l in inputs:
+        if isinstance(tc_l, str):
+            tc_l = [tc_l]
+
+        for tc in tc_l:
+            test_idx = len(test_cases) + 1
+
+            use_timeout = command_timeout
+            if first_command_timeout is not None and not commands:
+                use_timeout = first_command_timeout
+            commands.append(
+                Command(
+                    command=["python3", "main.py", str(test_idx)],
+                    timeout=use_timeout,
+                )
+            )
+            tc = APPS_IF_BRANCH.replace("%%%test_id%%%", str(test_idx)).replace(
+                "%%%test_case%%%", tc
+            )
+            if test_idx != 1:
+                tc = "el" + tc
+            test_cases.append(tc)
+
+        if max_commands and len(commands) >= max_commands:
+            break
+
+    test_cases = APPS_ASSERT_IF_TEMPLATE.replace(
+        "%%%TEST_IFS%%%", "\n".join(test_cases)
+    )
+    files["main.py"] = files["main.py"] + "\n\n" + test_cases
 
     return Executable(
         files=files,
@@ -336,7 +335,7 @@ def preprocessor(
     solution_str_key: str = "solution",
     solution_list_key: str = "solutions",
     max_memory: str = "4*1024*1024*1024",
-) -> Executable:
+) -> List[Executable]:
     out = []
 
     if "exec_mode" not in problem:
@@ -404,8 +403,8 @@ def postprocessor(
 def evaluate(
     predictions: List[Dict],
     num_workers: int,
-    timeout: int = 10,
-    command_timeout: float = 2.0,
+    first_command_timeout: int = 10,
+    command_timeout: float = 1.0,
     max_commands: int = None,
     early_stopping: bool = False,
     k_vals: List[int] = None,
@@ -422,7 +421,7 @@ def evaluate(
         ),
         preprocessor=partial(
             preprocessor,
-            first_command_timeout=timeout,
+            first_command_timeout=first_command_timeout,
             command_timeout=command_timeout,
             max_commands=max_commands,
             early_stopping=early_stopping,

@@ -49,6 +49,17 @@ class CommandResult:
         """Whether the last command had an error."""
         return self.return_code != 0 or self.had_unexpected_error
 
+    def __repr__(self):
+        if self.timed_out:
+            return f"CommandResult(return_code={self.return_code}, runtime={self.runtime}, timed_out={self.timed_out})"
+
+        if self.stdout:
+            use_str = self.stdout
+        else:
+            use_str = self.stderr
+
+        return f"CommandResult(return_code={self.return_code}, runtime={self.runtime}, output={use_str[:50]}...)"
+
 
 @dataclasses.dataclass(frozen=True)
 class ExecutionResult:
@@ -134,6 +145,12 @@ class ExecutionResult:
             expected_num_commands=num_commands,
         )
 
+    def __getitem__(self, idx: int) -> CommandResult:
+        return self.command_results[idx]
+
+    def __len__(self) -> int:
+        return len(self.command_results)
+
 
 def default_should_early_stop(*_, **_k) -> bool:
     _ = _k
@@ -160,6 +177,7 @@ class Executable:
     should_early_stop: Callable[[int, CommandResult], bool] = (
         default_should_early_stop
     )
+    stdout_postprocessor: Optional[Callable[[str], str]] = None
 
     def __post_init__(self):
         if not callable(self.should_early_stop):
@@ -188,3 +206,4 @@ class CommandsToRun:
     should_early_stop: Callable[[int, CommandResult], bool] = (
         default_should_early_stop
     )
+    stdout_postprocessor: Optional[Callable[[str], str]] = None

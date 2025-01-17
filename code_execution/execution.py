@@ -9,7 +9,7 @@ import pathlib
 import subprocess
 import time
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 import psutil
@@ -104,6 +104,7 @@ def safe_execute(
     timeout: int = 10,
     num_times: int = 1,
     stdin: Optional[str] = None,
+    stdout_postprocessor: Optional[Callable] = None,
 ) -> CommandResult:
     """Executes a list of commands safely.
     Args:
@@ -112,6 +113,8 @@ def safe_execute(
       timeout Timeout.
       num_times: Number of times to execute the command. Useful for getting
         runtime and memory means.
+      stdin: The stdin for the command.
+      stdout_postprocessor: A postprocessor for the stdout.
     Returns:
       The result of executing the command.
     """
@@ -134,6 +137,9 @@ def safe_execute(
         res["runtime"] = times[0]
     else:
         res["runtime"] = float(np.mean(times))
+
+    if stdout_postprocessor:
+        res["stdout"] = stdout_postprocessor(res["stdout"])
 
     return CommandResult(**res)
 
@@ -161,6 +167,7 @@ def serial_execute_code(sample: CommandsToRun) -> ExecutionResult:
             timeout=command.timeout,
             num_times=command.num_times,
             stdin=command.stdin,
+            stdout_postprocessor=sample.stdout_postprocessor,
         )
         results.append(res)
         if res.timed_out or res.return_code != 0 or res.had_unexpected_error:

@@ -408,13 +408,19 @@ _set_mem_limit()
 """
 
 
-def get_mem_limit_code(mem_limit: str) -> str:
+def get_mem_limit_code(mem_limit: Optional[str], trailing: str = "\n") -> str:
     """Gets the code to set the memory limit.
 
     Args:
-        mem_limit (str): The memory limit value as a string. You can do something like "4 * 1024" or "1024".
-
+        mem_limit (str): The memory limit value as a string. You can do
+            something like "4 * 1024" or "1024". If None, will return an
+            empty string.
+        trailing: The trailing characters to add to the code.
     Returns:
         str: The code to set the memory limit.
     """
-    return MEM_MAX_CODE.replace("%%MEM_LIMIT%%", mem_limit)
+    if mem_limit is None:
+        return ""
+
+    out = MEM_MAX_CODE.replace("%%MEM_LIMIT%%", mem_limit)
+    return out + trailing

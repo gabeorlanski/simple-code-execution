@@ -277,6 +277,7 @@ def postprocess_program_result(
     result: ExecutionResult,
     expected_outputs: List[str],
     test_types: List[int],
+    num_stdout_save: int = None,
 ) -> bool:
     if isinstance(pred, str):
         pred = {"solution": pred}
@@ -319,13 +320,21 @@ def postprocess_program_result(
             has_generated = True
             passed_generated &= outcome
 
+    stdout = [r.stdout for r in result.command_results]
+    if num_stdout_save is not None:
+        stdout = stdout[-num_stdout_save:]
+
     out_dict = {
         **pred,
+        "timeout": result.timed_out,
+        "had_error": result.had_error,
+        "return_code": result.last_cmd.return_code,
         "passed": passed,
         "passed_public": passed_public,
         "outcomes": outcomes,
         "stderr": result.last_cmd.stderr,
-        "stdout": result.last_cmd.stdout,
+        "stdout": stdout,
+        "num_ran": len(result.command_results),
     }
 
     if has_generated:
@@ -342,6 +351,7 @@ def postprocess(
     solution_list_key: str = "solutions",
     exclude_private: bool = False,
     exclude_generated: bool = False,
+    num_stdout_save: int = None,
 ):
     expected_outputs = []
     expected_test_types = []
@@ -363,6 +373,7 @@ def postprocess(
                 res,
                 expected_outputs,
                 expected_test_types,
+                num_stdout_save=num_stdout_save,
             )
         )
 
@@ -389,6 +400,7 @@ def evaluate(
     ensure_all_run: bool = False,
     python_command: str = "python3",
     force_command_timeout: bool = False,
+    num_stdout_save: int = None,
 ) -> Tuple[Dict, List[Dict]]:
     logger.info("Evaluating predictions for code contests.")
     if "inputs" not in predictions[0]:
@@ -424,6 +436,7 @@ def evaluate(
             exclude_generated=exclude_generated,
             solution_list_key=solution_list_key,
             max_commands=max_commands,
+            num_stdout_save=num_stdout_save,
         ),
         preproc_returns_list=True,
     )

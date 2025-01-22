@@ -124,9 +124,16 @@ def _clean_stdout(stdout: str):
 
 def filter_solutions(
     languages: List[int], solutions: List[str], keep_languages: Set[int]
-) -> List[str]:
+) -> Tuple[List[int], List[str]]:
 
-    return [s for s, l in zip(solutions, languages) if l in keep_languages]
+    langs = []
+    sols = []
+    for s, l in zip(solutions, languages):
+        if l in keep_languages:
+            langs.append(l)
+            sols.append(s)
+
+    return langs, sols
 
 
 def process_problem(problem: Dict) -> Dict:
@@ -170,9 +177,22 @@ def is_stdout_correct(actual: str, expected: str):
 
 
 def should_stop_early(
-    cmd_idx: int, res: CommandResult, expected_out: List[str]
+    cmd_idx: int,
+    res: CommandResult,
+    expected_out: List[str],
+    last_real_test_idx: Optional[int] = None,
+    ensure_real_tests_run: bool = False,
 ) -> bool:
     """Determines if we should stop execution early."""
+
+    # If we are ensuring that all REAL tests run, then we don't want to stop the
+    # execution until we encounter a generated test.
+    if (
+        ensure_real_tests_run
+        and last_real_test_idx is not None
+        and cmd_idx < last_real_test_idx
+    ):
+        return False
 
     if res.had_error or res.timed_out:
         return True
@@ -201,7 +221,7 @@ def preprocess(
     max_commands: Optional[int] = None,
     exclude_private: bool = False,
     exclude_generated: bool = False,
-    ensure_all_run: bool = False,
+    ensure_real_tests_run: bool = False,
     python_command: str = "python3",
     force_command_timeout: bool = False,
 ) -> List[Executable]:
@@ -211,18 +231,30 @@ def preprocess(
         new_inputs = []
         new_outputs = []
         new_test_types = []
+        last_real_test_idx = None
         for i, t_type in enumerate(problem["test_types"]):
             if exclude_private and t_type == 1:
                 continue
             if exclude_generated and t_type == 2:
                 continue
+
             new_inputs.append(inputs[i])
             new_outputs.append(problem["outputs"][i])
             new_test_types.append(t_type)
+
+            if t_type != 2:
+                last_real_test_idx = len(new_inputs)
         inputs = new_inputs
         problem["outputs"] = new_outputs
         problem["test_types"] = new_test_types
 
+    else:
+        try:
+            # Find the index of the first generated test.
+            last_real_test_idx = problem["test_types"].index(2)
+        except ValueError:
+            # There are no generated tests.
+            last_real_test_idx = None
     if not disable_memory_limit and problem["memory_limit_bytes"] > 0:
         mem_code = eval_utils.get_mem_limit_code(
             str(problem["memory_limit_bytes"]), "\n\n"
@@ -236,6 +268,7 @@ def preprocess(
     if problem.get("time_limit") is not None and not force_command_timeout:
         time_limit = problem["time_limit"]
         time_limit = time_limit["seconds"] + time_limit["nanos"] / 1e9
+        time_limit = min(time_limit, command_timeout)
     else:
         time_limit = command_timeout
 
@@ -243,6 +276,8 @@ def preprocess(
         early_stop_fn = partial(
             should_stop_early,
             expected_out=problem["outputs"][: len(inputs)],
+            ensure_real_tests_run=ensure_real_tests_run,
+            last_real_test_idx=last_real_test_idx,
         )
     else:
         early_stop_fn = default_should_early_stop
@@ -261,7 +296,7 @@ def preprocess(
             inputs=inputs,
             commands=[python_command, "main.py"],
             early_stop_fn=early_stop_fn,
-            ensure_all_run=ensure_all_run,
+            ensure_all_run=False,
             tracked_files=[],
             first_command_timeout=first_command_timeout or 0,
             command_timeout=time_limit,
@@ -307,9 +342,9 @@ def postprocess_program_result(
         if not test_passed:
             passed = False
 
+    # Check to see if we passed each test type.
     has_private = has_generated = False
     passed_public = passed_private = passed_generated = True
-
     for t_type, outcome in zip(test_types, outcomes):
         if t_type == 0:
             passed_public &= outcome
@@ -353,6 +388,21 @@ def postprocess(
     exclude_generated: bool = False,
     num_stdout_save: int = None,
 ):
+    """Postprocesses the results of a list of predictions for a single problem.
+
+    Args:
+        problem (Dict): The problem to postprocess the results for.
+        results (List[ExecutionResult]): The results of the predictions.
+        max_commands (Optional[int]): The maximum number of commands to execute
+            per problem.
+        solution_list_key (str): The key for the list of solutions in the predictions.
+        exclude_private (bool): Whether to exclude private tests.
+        exclude_generated (bool): Whether to exclude generated tests.
+        num_stdout_save (int): The number of stdout outputs to save for each
+            prediction.
+    Returns:
+        A dictionary containing the postprocessed results.
+    """
     expected_outputs = []
     expected_test_types = []
     for i, t_type in enumerate(problem["test_types"]):
@@ -397,12 +447,50 @@ def evaluate(
     solution_list_key: str = "solutions",
     exclude_private: bool = False,
     exclude_generated: bool = False,
-    ensure_all_run: bool = False,
+    ensure_real_tests_run: bool = False,
     python_command: str = "python3",
     force_command_timeout: bool = False,
     num_stdout_save: int = None,
 ) -> Tuple[Dict, List[Dict]]:
+    """Evaluates predictions for CodeContests dataset.
+
+    Assumes that predictions is a list of dictionaries where each element is a
+    problem from the CodeContests dataset.
+
+    Args:
+        predictions: List[Dict]: A list of dictionaries where each element is a
+            problem from the CodeContests dataset.
+        num_workers (int): The number of workers to use for multiprocessing.
+        first_command_timeout (int): The timeout for the first command in seconds.
+        command_timeout (float): The timeout for each command in seconds. If
+            there is a time_limit for the problem, then the min of the two will
+            be used assuming force_command_timeout is False.
+        max_commands (int): The maximum number of commands to execute per problem.
+        early_stopping (bool): Whether to stop execution early if a test fails.
+        disable_memory_limit (bool): Whether to disable memory limit set by each problem.
+        k_vals (List[int]): A list of integers for pass@k evaluation.
+        execution_kwargs (Dict): Additional keyword arguments to pass to the
+            execution config.
+        solution_str_key (str): The key for the solution string in the predictions.
+        solution_list_key (str): The key for the list of solutions in the predictions.
+        exclude_private (bool): Whether to exclude private tests.
+        exclude_generated (bool): Whether to exclude generated tests.
+        ensure_real_tests_run (bool): Whether to ensure that all non-generated tests are run.
+        python_command (str): The command to use for executing Python code.
+        force_command_timeout (bool): Whether to force the command timeout to be the
+            maximum of the command_timeout and the time_limit set by each
+            problem or just use command_timeout.
+        num_stdout_save (int): The number of stdout outputs to save for each
+            prediction.
+
+    Returns:
+        metrics (Dict): A dictionary containing the evaluation metrics.
+        result (List[Dict]): A list of dictionaries containing the evaluation
+            results for each problem.
+    """
     logger.info("Evaluating predictions for code contests.")
+
+    # If the predictions don't have inputs, then we need to process the problems.
     if "inputs" not in predictions[0]:
         logger.info("Processing problems.")
         predictions = [
@@ -426,7 +514,7 @@ def evaluate(
             disable_memory_limit=disable_memory_limit,
             exclude_private=exclude_private,
             exclude_generated=exclude_generated,
-            ensure_all_run=ensure_all_run,
+            ensure_real_tests_run=ensure_real_tests_run,
             python_command=python_command,
             force_command_timeout=force_command_timeout,
         ),

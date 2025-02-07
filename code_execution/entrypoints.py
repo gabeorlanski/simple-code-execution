@@ -372,7 +372,7 @@ def execute_predictions(
             all_results.extend(res)
             elapsed += el
             logger.debug("Finished execution, cleaning up...")
-            if debug_dir is None:
+            if debug_dir is not None:
                 cleanup(
                     files,
                     rate_limit=config.write_rate_limit,

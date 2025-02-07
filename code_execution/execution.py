@@ -421,4 +421,4 @@ def execute_commands(
         )
 
         pbar_generator.close()
-    return results
+    return elapsed, results

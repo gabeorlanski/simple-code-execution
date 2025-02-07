@@ -276,7 +276,8 @@ def execute_predictions(
     preproc_returns_list: bool = False,
     preproc_batch_size: int = 1,
     error_directory: Optional[Path] = None,
-) -> List[Dict]:
+    return_elapsed: bool = False,
+) -> Union[List[Dict], Tuple[float, List[Dict]]]:
     """Executes the program predictions.
 
     First preprocesses the commands to run, writes them to disk, then executes
@@ -295,8 +296,10 @@ def execute_predictions(
             or one-to-many. Defaults to False.
         preproc_batch_size (int, optional): The batch size for preprocessing. Defaults to 1.
         error_directory (Path, optional): The directory to save errors to. Defaults to None.
+        return_elapsed (bool, optional): Whether to return the elapsed time. Defaults to False.
     Returns:
         List[Dict]: The executed predictions.
+        float: The elapsed time if return_elapsed is True.
     """
     if postprocessor is None:
         logger.info("Using default postprocessor")
@@ -351,6 +354,7 @@ def execute_predictions(
         assert len(file_chunks) == len(command_chunks)
         logger.debug(f"{len(file_chunks)} chunks to execute.")
         all_results = []
+        elapsed = 0
         for chunk_idx, (files, commands) in enumerate(
             zip(file_chunks, command_chunks)
         ):
@@ -364,8 +368,9 @@ def execute_predictions(
                 exec_dir=dir_to_use,
                 error_directory=error_directory,
             )
-            all_results.extend(execute_commands(commands, config))
-
+            el, res = execute_commands(commands, config)
+            all_results.extend(res)
+            elapsed += el
             logger.debug("Finished execution, cleaning up...")
             if debug_dir is None:
                 cleanup(
@@ -375,7 +380,7 @@ def execute_predictions(
                 )
         all_results = {result[0]: result[1] for result in all_results}
         all_results.update(filtered_results)
-        return postprocess_commands(
+        postprocessed = postprocess_commands(
             raw_preds=pred_list,
             results=all_results,
             postprocessor=postprocessor,
@@ -383,6 +388,9 @@ def execute_predictions(
             disable_tqdm=config.disable_tqdm,
             log_freq=config.log_freq,
         )
+        if return_elapsed:
+            return elapsed, postprocessed
+        return postprocessed
 
     if debug_dir is None:
         tmp_dir_loc = os.getenv("EXEC_TMP_DIR")

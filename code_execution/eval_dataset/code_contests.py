@@ -16,7 +16,6 @@ from code_execution.entrypoints import execute_predictions
 from code_execution.eval_dataset import eval_utils
 from code_execution.eval_dataset.metrics import estimate_pass_at_k
 from code_execution.execution import ExecutionConfig
-from code_execution.utils import get_mem_limit_code
 
 logger = logging.getLogger(__name__)
 
@@ -326,6 +325,7 @@ def postprocess_program_result(
         "outcomes": outcomes,
         "stderr": result.last_cmd.stderr,
         "stdout": result.last_cmd.stdout,
+        "elapsed": result.elapsed,
     }
 
     if has_generated:
@@ -398,7 +398,7 @@ def evaluate(
             for p in tqdm(predictions, desc="Processing problems")
         ]
 
-    results = execute_predictions(
+    elapsed, results = execute_predictions(
         pred_list=predictions,
         config=ExecutionConfig(
             num_workers=num_workers, **(execution_kwargs or {})
@@ -426,6 +426,7 @@ def evaluate(
             max_commands=max_commands,
         ),
         preproc_returns_list=True,
+        return_elapsed=True,
     )
 
     num_samples = 1
@@ -436,6 +437,7 @@ def evaluate(
 
     metrics = {
         "percent_passed": sum(pc > 0 for pc in pass_counts) / len(pass_counts),
+        "elapsed": elapsed,
     }
     for k in k_vals or [1, 5, 10]:
         if k > num_samples:

@@ -359,22 +359,22 @@ def _parallel_execute_code(
 
         pool.close()
         pool.terminate()
-
+    elapsed = time.time() - start_time
     logger.info(
-        f"Finished executing {len(results):,} in {seconds_to_human(time.time() - start_time)}"
+        f"Finished executing {len(results):,} in {seconds_to_human(elapsed)}"
     )
 
     if len(results) != total_commands:
         raise ValueError(
             f"Expected {total_commands:,} results, got {len(results):,}"
         )
-    return results
+    return elapsed, results
 
 
 def execute_commands(
     predictions,
     config: ExecutionConfig,
-) -> List[ExecutionResult]:
+) -> Tuple[float, List[ExecutionResult]]:
     """Executes a list of commands."""
     if not LOGGING_IS_CONFIGURED:
         print(f"Executing {len(predictions):,} predictions")
@@ -396,7 +396,7 @@ def execute_commands(
 
     # Yes, this is not entirely parallel, but it makes debugging so much easier.
     if num_workers > 1:
-        results = _parallel_execute_code(
+        elapsed, results = _parallel_execute_code(
             to_run=to_run,
             max_processes=num_workers,
             num_executors=config.num_executors,
@@ -412,7 +412,7 @@ def execute_commands(
             desc="Executing Predictions",
             disable=config.disable_tqdm,
         )
-        results = get_results_from_generator(
+        elapsed, results = get_results_from_generator(
             generator=pbar_generator,
             total=len(to_run),
             target_returns_multiple=config.batched,

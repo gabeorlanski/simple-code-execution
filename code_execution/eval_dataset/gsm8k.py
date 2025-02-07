@@ -46,6 +46,7 @@ def postprocess_program_result(
         "return_code": result.last_cmd.return_code,
         "stderr": result.last_cmd.stderr,
         "stdout": result.last_cmd.stdout,
+        "elapsed": result.elapsed,
     }
 
 
@@ -114,7 +115,7 @@ def evaluate(
 
     logger.info("Evaluating GSM8K dataset")
 
-    results = execute_predictions(
+    elapsed, results = execute_predictions(
         pred_list=predictions,
         config=ExecutionConfig(num_workers=num_workers),
         preprocessor=partial(
@@ -126,6 +127,7 @@ def evaluate(
         ),
         postprocessor=partial(postprocess, solution_list_key=solution_list_key),
         preproc_returns_list=True,
+        return_elapsed=True,
     )
 
     num_samples = 1
@@ -134,7 +136,9 @@ def evaluate(
         pass_counts.append(sum([p["passed"] for p in r["predictions"]]))
         num_samples = max(num_samples, len(r["predictions"]))
 
-    metrics = {}
+    metrics = {
+        "elapsed": elapsed,
+    }
     for k in k_vals or [1, 5, 10]:
         if k > num_samples:
             break

@@ -18,6 +18,7 @@ from typing import Callable, Generator, List, Optional, Tuple
 from tqdm import tqdm
 
 from code_execution import utility_modules
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -268,6 +269,7 @@ def get_results_from_generator(
 
     # Create a counter for completed since the size of results will not
     # always go up by one.
+    start_time = time.time()
     num_completed = 0
     for r in generator:
         if target_returns_multiple:
@@ -280,7 +282,8 @@ def get_results_from_generator(
 
         if num_completed % garbage_collect_freq == 0:
             gc.collect()
-    return results
+    elapsed = time.time() - start_time
+    return elapsed, results
 
 
 def run_in_parallel(
@@ -347,7 +350,7 @@ def run_in_parallel(
             pbar_generator = generator_creator(
                 pool.imap(target, args, chunksize=chunk_size),
             )
-            results = get_results_from_generator(
+            elapsed, results = get_results_from_generator(
                 generator=pbar_generator,
                 total=len(args),
                 target_returns_multiple=target_returns_multiple,
@@ -360,7 +363,7 @@ def run_in_parallel(
     else:
         logger.debug("Running in serial as num_workers=1")
         pbar_generator = generator_creator(map(target, args))
-        results = get_results_from_generator(
+        elapsed, results = get_results_from_generator(
             generator=pbar_generator,
             total=len(args),
             target_returns_multiple=target_returns_multiple,
@@ -369,6 +372,7 @@ def run_in_parallel(
         )
 
     pbar_generator.close()
+    logger.debug(f"Finished {desc} in {elapsed:.2f} seconds")
     return results
 
 

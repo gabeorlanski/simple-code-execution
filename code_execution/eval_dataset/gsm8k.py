@@ -105,7 +105,7 @@ def evaluate(
     num_workers: int,
     timeout: int = 10,
     entrypoint: int = "solution",
-    solution_key: str = "solution",
+    solution_str_key: str = "solution",
     solution_list_key: str = "solutions",
     k_vals: List[int] = None,
 ) -> Tuple[Dict, List[Dict]]:
@@ -122,7 +122,7 @@ def evaluate(
             preprocess,
             timeout=timeout,
             entrypoint=entrypoint,
-            solution_key=solution_key,
+            solution_key=solution_str_key,
             solution_list_key=solution_list_key,
         ),
         postprocessor=partial(postprocess, solution_list_key=solution_list_key),

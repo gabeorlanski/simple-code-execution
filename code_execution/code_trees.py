@@ -5,6 +5,7 @@ from typing import Callable, List, Tuple, Union
 
 from .utils import ContextTimeLimitException
 from .utils import run_in_parallel
+from .utils import swallow_io
 from .utils import time_limit
 
 logger = logging.getLogger(__name__)
@@ -13,9 +14,17 @@ logger = logging.getLogger(__name__)
 def safe_ast_parse(code) -> ast.Module:
     """Safely parse a string of code into an AST, if possible. Otherwise return None."""
     try:
-        with time_limit(5):
-            res = ast.parse(code)
-    except (SyntaxError, ValueError, RecursionError, ContextTimeLimitException, MemoryError):
+        with swallow_io():
+            with time_limit(5):
+
+                res = ast.parse(code)
+    except (
+        SyntaxError,
+        ValueError,
+        RecursionError,
+        ContextTimeLimitException,
+        MemoryError,
+    ):
         return None
     return res
 

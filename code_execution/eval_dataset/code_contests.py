@@ -367,7 +367,7 @@ def postprocess_program_result(
         "passed_public": passed_public,
         "outcomes": outcomes,
         "stderr": result.last_cmd.stderr,
-        "command_elapsed": [r.elapsed for r in result.command_results],
+        "command_elapsed": [r.runtime for r in result.command_results],
         "elapsed": result.elapsed,
         "stdout": stdout,
         "num_ran": len(result.command_results),

@@ -2,7 +2,6 @@ import logging
 from functools import partial
 from typing import Dict, List, Tuple
 
-from datasets import Dataset
 
 from code_execution.data_structures import Command
 from code_execution.data_structures import Executable

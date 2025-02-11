@@ -55,6 +55,7 @@ def _make_dummy_execution_result(stdout):
         elapsed=0.0,
         cwd="",
         tracked_files={},
+        expected_num_commands=1,
     )
 
 
@@ -212,6 +213,7 @@ def _preprocessor(pred):
             elapsed=0.0,
             cwd="",
             tracked_files={},
+            expected_num_commands=1,
         )
     return Executable(
         {"main.py": pred["prediction"]},

@@ -4,7 +4,6 @@ from functools import partial
 from typing import Dict, List, Optional, Set, Tuple
 
 import numpy as np
-from datasets import Dataset
 from tqdm import tqdm
 
 from code_execution.data_structures import Command
@@ -16,6 +15,7 @@ from code_execution.entrypoints import execute_predictions
 from code_execution.eval_dataset import eval_utils
 from code_execution.eval_dataset.metrics import estimate_pass_at_k
 from code_execution.execution import ExecutionConfig
+import math
 
 logger = logging.getLogger(__name__)
 
@@ -164,13 +164,13 @@ def is_stdout_correct(actual: str, expected: str):
 
     if actual == expected:
         return True
-    if actual.replace("", "") == expected.replace("", ""):
+    if actual.replace(" ", "") == expected.replace(" ", ""):
         return True
 
     try:
         actual = float(actual)
         expected = float(expected)
-        return abs(actual - expected) < 1e-6
+        return math.isclose(actual, expected, abs_tol=1e-6)
     except ValueError:
         return False
 

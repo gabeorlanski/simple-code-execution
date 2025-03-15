@@ -83,7 +83,7 @@ def pass_cmd_to_run(passing_program, tmpdir, request):
 
 @pytest.mark.parametrize("pass_cmd_to_run", [1, 2], indirect=True)
 def test_execute_code(passing_program, pass_cmd_to_run):
-    result = execution.serial_execute_code(pass_cmd_to_run)
+    result = execution.serial_execute_code(key="1.0", sample=pass_cmd_to_run)
     assert not result.had_error
     assert not result.timed_out
     assert len(result.command_results) == len(pass_cmd_to_run.commands)
@@ -98,7 +98,9 @@ def test_execute_code_fail(error_program, tmpdir, num_commands):
     cmd = [Command(command=["python", "test.py"], timeout=1)] * num_commands
     cmd_to_run = make_cmd_to_run(error_program, tmpdir, commands=cmd)
 
-    result = execution.serial_execute_code(cmd_to_run)
+    result = execution.serial_execute_code(key="1.0", sample=cmd_to_run)
+
+    assert result.key == "1.0"
     assert result.had_error
     assert not result.timed_out
     assert len(result.command_results) == 1
@@ -114,7 +116,8 @@ def test_execute_code_timeout(timeout_program, tmpdir, dummy_commands):
         timeout_program, tmpdir, commands=dummy_commands
     )
 
-    result = execution.serial_execute_code(cmd_to_run)
+    result = execution.serial_execute_code(key="1.0", sample=cmd_to_run)
+    assert result.key == "1.0"
     assert not result.had_error
     assert result.timed_out
     assert len(result.command_results) == 1
@@ -221,7 +224,7 @@ def test_parallel_code_execution(
         num_executors=num_executors,
     )
 
-    results = execution.execute_commands(commands, config)
+    *_, results = execution.execute_commands(commands, config)
     keys, results = zip(*results)
     assert [i[0] for i in sorted(keys, key=lambda x: x[0])] == list(
         range(num_preds)
@@ -279,7 +282,7 @@ def test_execute_ignore_errors(
         passing_program, error_program, tmpdir, ignore_errors, cmds
     )
 
-    result = execution.serial_execute_code(to_run)
+    result = execution.serial_execute_code(key="1.0", sample=to_run)
 
     assert len(result.command_results) == first_fail
     for actual, expected in zip(result.command_results, cmds):
@@ -301,8 +304,9 @@ def test_execute_stdin(stdin_program, tmpdir, as_list):
         cwd=cwd,
         commands=[Command(command=command, timeout=1, stdin=stdin)],
     )
-    result = execution.serial_execute_code(command)
+    result = execution.serial_execute_code(key="1.0", sample=command)
 
+    assert result.key == "1.0"
     assert result.command_results[0].stdout == "Input 1: 1\nInput 2: 2\n"
 
 
@@ -317,7 +321,9 @@ def test_execute_looped_stdin(loop_stdin_program, tmpdir, as_list):
         cwd=cwd,
         commands=[Command(command=command, timeout=1, stdin=stdin)],
     )
-    result = execution.serial_execute_code(command)
+    result = execution.serial_execute_code(key=1.0, sample=command)
+
+    assert result.key == 1.0
     assert result.command_results[0].stdout == "Input: 1\nInput: 2\nInput: 4\n"
     assert result.command_results[0].stderr.endswith(
         "EOFError: EOF when reading a line\n"

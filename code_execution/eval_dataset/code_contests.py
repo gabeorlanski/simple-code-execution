@@ -1,5 +1,7 @@
 import logging
+import math
 import re
+import time
 from functools import partial
 from typing import Dict, List, Optional, Set, Tuple
 
@@ -15,7 +17,6 @@ from code_execution.entrypoints import execute_predictions
 from code_execution.eval_dataset import eval_utils
 from code_execution.eval_dataset.metrics import estimate_pass_at_k
 from code_execution.execution import ExecutionConfig
-import math
 
 logger = logging.getLogger(__name__)
 
@@ -59,12 +60,25 @@ def fix_test_problem_92(problem: Dict):
         "input": [],
         "output": [],
     }
-    for i, input in enumerate(private_tests["input"]):
-        if (
-            len(set(input)) == 4
-        ):  # {'a', 'b',  '1', '\n'} - according to the description, the string should contain only 'a' and 'b'
+    for i, input_stdin in enumerate(private_tests["input"]):
+        try:
+            num_tests, rem = input_stdin.split("\n", 1)
+        except ValueError:
+            continue
 
-            new_private_tests["input"].append(input)
+        if not num_tests.isnumeric():
+            continue
+
+        if set(rem) == {
+            "a",
+            "b",
+            "\n",
+        } or set(rem) == {
+            "a",
+            "b",
+        }:
+
+            new_private_tests["input"].append(input_stdin)
             new_private_tests["output"].append(private_tests["output"][i])
     problem["private_tests"] = new_private_tests
 
@@ -74,11 +88,22 @@ def fix_test_problem_92(problem: Dict):
         "output": [],
     }
 
-    for i, input in enumerate(generated_tests["input"]):
-        if (
-            len(set(input)) == 4
-        ):  # {'a', 'b',  '1', '\n'} - according to the description, the string should contain only 'a' and 'b'
-            new_generated_tests["input"].append(input)
+    for i, input_stdin in enumerate(generated_tests["input"]):
+        try:
+            num_tests, rem = input_stdin.split("\n", 1)
+        except ValueError:
+            continue
+        if not num_tests.isnumeric():
+            continue
+        if set(rem) == {
+            "a",
+            "b",
+            "\n",
+        } or set(rem) == {
+            "a",
+            "b",
+        }:
+            new_generated_tests["input"].append(input_stdin)
             new_generated_tests["output"].append(generated_tests["output"][i])
     problem["generated_tests"] = new_generated_tests
     return problem
@@ -267,7 +292,7 @@ def preprocess(
     if problem.get("time_limit") is not None and not force_command_timeout:
         time_limit = problem["time_limit"]
         time_limit = time_limit["seconds"] + time_limit["nanos"] / 1e9
-        time_limit = min(time_limit, command_timeout)
+        time_limit = max(time_limit, command_timeout)
     else:
         time_limit = command_timeout
 
@@ -313,6 +338,7 @@ def postprocess_program_result(
     test_types: List[int],
     num_stdout_save: int = None,
 ) -> bool:
+    start = time.time()
     if isinstance(pred, str):
         pred = {"solution": pred}
 
@@ -363,12 +389,15 @@ def postprocess_program_result(
         "timeout": result.timed_out,
         "had_error": result.had_error,
         "return_code": result.last_cmd.return_code,
+        "writing_time": result.writing_time,
+        "cleanup_time": result.cleanup_time,
+        "preprocess_time": result.preprocess_time,
+        "exec_time": result.elapsed,
         "passed": passed,
         "passed_public": passed_public,
         "outcomes": outcomes,
         "stderr": result.last_cmd.stderr,
         "command_elapsed": [r.runtime for r in result.command_results],
-        "elapsed": result.elapsed,
         "stdout": stdout,
         "num_ran": len(result.command_results),
     }
@@ -377,6 +406,8 @@ def postprocess_program_result(
         out_dict["passed_generated"] = passed_generated
     if has_private:
         out_dict["passed_private"] = passed_private
+
+    out_dict["postprocess_time"] = time.time() - start
     return out_dict
 
 
@@ -427,9 +458,9 @@ def postprocess(
                 num_stdout_save=num_stdout_save,
             )
         )
-
+    out_dict = {k: v for k, v in problem.items() if k != solution_list_key}
     return {
-        **problem,
+        **out_dict,
         "predictions": out,
     }
 
@@ -438,7 +469,7 @@ def evaluate(
     predictions: List[Dict],
     num_workers: int,
     first_command_timeout: int = 10,
-    command_timeout: float = 1.0,
+    command_timeout: float = 5.0,
     max_commands: int = None,
     early_stopping: bool = False,
     disable_memory_limit: bool = False,
@@ -499,7 +530,7 @@ def evaluate(
             for p in tqdm(predictions, desc="Processing problems")
         ]
 
-    elapsed, results = execute_predictions(
+    result = execute_predictions(
         pred_list=predictions,
         config=ExecutionConfig(
             num_workers=num_workers, **(execution_kwargs or {})
@@ -528,18 +559,17 @@ def evaluate(
             num_stdout_save=num_stdout_save,
         ),
         preproc_returns_list=True,
-        return_elapsed=True,
     )
 
     num_samples = 1
     pass_counts = []
-    for r in results:
+    for r in result.results:
         pass_counts.append(sum([p["passed"] for p in r["predictions"]]))
         num_samples = max(num_samples, len(r["predictions"]))
 
     metrics = {
         "percent_passed": sum(pc > 0 for pc in pass_counts) / len(pass_counts),
-        "elapsed": elapsed,
+        **result.timing_dict,
     }
     for k in k_vals or [1, 5, 10]:
         if k > num_samples:
@@ -550,4 +580,4 @@ def evaluate(
             ).mean()
         )
 
-    return metrics, results
+    return metrics, result.results

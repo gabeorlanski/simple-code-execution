@@ -1,8 +1,9 @@
-""" Module for handling writing executables to disk. """
+"""Module for handling writing executables to disk."""
 
 import asyncio
 import logging
 import shutil
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Tuple
 
@@ -32,7 +33,7 @@ async def _async_write_executables(
     async def write_pred(idx, files, pred_dir):
         async with sem:
             pred_dir.mkdir(exist_ok=True)
-
+            start = datetime.now()
             for name, contents in files.items():
                 filepath = pred_dir.joinpath(name)
                 try:
@@ -51,7 +52,8 @@ async def _async_write_executables(
                     raise WritingFailure(
                         f"Failed to write {name} to {pred_dir} because of {e}"
                     ) from e
-            return idx, pred_dir.resolve().absolute()
+            write_elapsed = (datetime.now() - start).total_seconds()
+            return idx, write_elapsed, pred_dir.resolve().absolute()
 
     tasks = [write_pred(*p) for p in pred_list]
     if enable_tqdm:
@@ -100,10 +102,13 @@ def write_executables(
         log_freq=log_freq,
     )
     logger.debug("Ensuring all files written...")
-    for idx, r in out_results:
+    times = {}
+    for idx, write_time, r in out_results:
+        times[idx] = write_time
         if not r.exists():
             raise ValueError(f"Directory for {idx} does not exist at {r}")
     logger.info("Wrote all files to disk")
+    return times
 
 
 async def _async_cleanup(
@@ -114,21 +119,26 @@ async def _async_cleanup(
     """Cleans up the executables on the disk asynchronously."""
     sem = asyncio.Semaphore(rate_limit)
 
-    async def cleanup_dir(pred_dir: Path):
+    async def cleanup_dir(pidx, pred_dir: Path):
         async with sem:
+            start = datetime.now()
             shutil.rmtree(pred_dir)
+            return pidx, (datetime.now() - start).total_seconds()
 
-    tasks = [cleanup_dir(p[-1]) for p in pred_list]
+    tasks = [cleanup_dir(p[0], p[-1]) for p in pred_list]
     if not enable_tqdm:
         gen = asyncio.as_completed(tasks)
     else:
         gen = tqdm_asyncio.as_completed(tasks, desc="Cleaning Up")
     completed = 0
+    times = {}
     for result in gen:
-        _ = await result
+        idx, elapsed = await result
+        times[idx] = elapsed
         completed += 1
         if completed % 100_000 == 0:
             logger.info(f"Deleted {completed}/{len(pred_list)} predictions")
+    return times
 
 
 def cleanup(
@@ -152,7 +162,7 @@ def cleanup(
         rate_limit,
     )
 
-    utils.notebook_safe_async_run(
+    times = utils.notebook_safe_async_run(
         _async_cleanup,
         pred_list=files,
         rate_limit=rate_limit,
@@ -163,3 +173,4 @@ def cleanup(
     for *_, d in files:
         if d.exists():
             raise ValueError(f"Directory for {d} exists")
+    return times

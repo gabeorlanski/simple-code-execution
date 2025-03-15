@@ -123,11 +123,12 @@ def test_execution(
     cmd = ["python", "main.py"]
 
     result = serial_execute_code(
-        CommandsToRun(
+        key="1.0",
+        sample=CommandsToRun(
             cwd=cwd,
             commands=[Command(command=cmd, timeout=10, num_times=1)],
             tracked_files=[],
-        )
+        ),
     )
     assert result.last_cmd.return_code == 0
     assert not result.timed_out

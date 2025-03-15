@@ -1,0 +1,255 @@
+[
+    {
+        "name": "1037_E. Trips",
+        "description": "TEST_DESCRIPTION",
+        "public_tests": {
+            "input": [
+                "4 4 2\n2 3\n1 2\n1 3\n1 4\n",
+                "5 8 2\n2 1\n4 2\n5 4\n5 2\n4 3\n5 1\n4 1\n3 2\n",
+                "5 7 2\n1 5\n3 2\n2 5\n3 4\n1 2\n5 3\n1 3\n"
+            ],
+            "output": [
+                "0\n0\n3\n3\n",
+                "0\n0\n0\n3\n3\n4\n4\n5\n",
+                "0\n0\n0\n0\n3\n4\n4\n"
+            ]
+        },
+        "private_tests": {
+            "input": [
+                "16 20 2\n10 3\n5 3\n10 5\n12 7\n7 6\n9 12\n9 6\n1 10\n11 16\n11 1\n16 2\n10 2\n14 4\n15 14\n4 13\n13 15\n1 8\n7 15\n1 7\n8 15\n",
+                "2 1 1\n2 1\n"
+            ],
+            "output": [
+                "0\n0\n3\n3\n3\n3\n7\n7\n7\n7\n7\n11\n11\n11\n11\n15\n15\n15\n15\n16\n",
+                "2\n"
+            ]
+        },
+        "generated_tests": {
+            "input": [
+                "16 20 2\n10 3\n5 3\n10 5\n12 7\n7 6\n9 10\n9 6\n1 10\n11 16\n11 1\n16 2\n10 2\n14 4\n15 14\n4 13\n13 15\n1 8\n7 15\n1 7\n8 15\n",
+                "16 20 2\n10 3\n5 3\n10 5\n12 7\n7 6\n9 10\n2 6\n1 10\n11 16\n11 1\n16 2\n10 2\n14 4\n15 14\n4 13\n13 15\n1 8\n7 15\n1 7\n8 15\n",
+                "16 20 2\n10 4\n5 3\n10 5\n12 7\n7 6\n9 12\n9 6\n1 10\n11 16\n11 1\n16 2\n10 2\n14 4\n15 14\n4 13\n13 15\n1 8\n7 15\n1 7\n8 15\n",
+                "9 8 2\n2 1\n4 2\n5 4\n5 2\n4 3\n5 1\n4 1\n3 2\n",
+                "16 20 2\n10 3\n5 3\n10 5\n12 7\n7 6\n9 10\n2 6\n1 10\n11 16\n11 1\n16 2\n10 2\n14 4\n15 14\n4 3\n13 15\n1 8\n7 15\n1 7\n8 15\n"
+            ],
+            "output": [
+                "0\n0\n3\n3\n3\n3\n3\n3\n3\n3\n3\n7\n7\n7\n7\n11\n11\n14\n14\n15\n",
+                "0\n0\n3\n3\n3\n3\n3\n3\n3\n3\n3\n7\n7\n7\n7\n11\n11\n13\n13\n14\n",
+                "0\n0\n0\n0\n0\n0\n4\n4\n4\n4\n4\n9\n9\n9\n9\n13\n13\n13\n13\n14\n",
+                "0\n0\n0\n3\n3\n4\n4\n5\n",
+                "0\n0\n3\n3\n3\n3\n3\n3\n3\n3\n3\n7\n7\n7\n7\n7\n7\n12\n12\n13\n"
+            ]
+        },
+        "source": 2,
+        "difficulty": 11,
+        "solutions": {
+            "language": [
+                3
+            ],
+            "solution": [
+                "from collections import deque\n\ndef solve(adj, m, k, uv):\n    n = len(adj)\n    nn = [len(a) for a in adj]\n    q = deque()\n    for i in range(n):\n        if nn[i] < k:\n            q.append(i)\n    while q:\n        v = q.popleft()\n        for u in adj[v]:\n            nn[u] -= 1\n            if nn[u] == k-1:\n                q.append(u)\n    res = [0]*m\n    nk = len([1 for i in nn if i >= k])\n    res[-1] = nk\n    for i in range(m-1, 0, -1):\n        u1, v1 = uv[i]\n\n        if nn[u1] < k or nn[v1] < k:\n            res[i - 1] = nk\n            continue\n        if nn[u1] == k:\n            q.append(u1)\n            nn[u1] -= 1\n        if not q and nn[v1] == k:\n            q.append(v1)\n            nn[v1] -= 1\n\n        if not q:\n            nn[u1] -= 1\n            nn[v1] -= 1\n            adj[u1].remove(v1)\n            adj[v1].remove(u1)\n\n        while q:\n            v = q.popleft()\n            nk -= 1\n            for u in adj[v]:\n                nn[u] -= 1\n                if nn[u] == k - 1:\n                    q.append(u)\n        res[i - 1] = nk\n    return res\n\nn, m, k = map(int, input().split())\na = [set() for i in range(n)]\nuv = []\nfor i in range(m):\n    u, v = map(int, input().split())\n    a[u - 1].add(v - 1)\n    a[v - 1].add(u - 1)\n    uv.append((u-1, v-1))\n\nres = solve(a, m, k, uv)\nprint(str(res)[1:-1].replace(' ', '').replace(',', '\\n'))"
+            ]
+        },
+        "incorrect_solutions": {
+            "language": [
+                3,
+                3,
+                3
+            ],
+            "solution": [
+                "print(1)",
+                "first = input()\nfirst = first.split()\nn = int(first[0])\nm = int(first[1])\nk = int(first[2])\n\nd= {}\nfor i in range(m):\n    new = input()\n    new = new.split()\n    f1 = int(new[0])\n    f2 = int(new[1])\n    if f1 in d:\n        d[f1].append(f2)\n    else:\n        d[f1] = [f2]\n\n    if f2 in d:\n        d[f2].append(f1)\n    else:\n        d[f2] = [f1]\n\n    count = 0\n    for friend in d:\n        if len(d[friend])>=k:\n            val = len(d[friend])\n            for person in d[friend]:\n                if len(d[person])<k:\n                    val -=1\n            if val>=k:\n                count+=1\n\n    print(count)\n\n",
+                "maxN =200005\nG = [None] * maxN\ns = set()\nk = [0] * 1\n\n\n\ndef delete(v):\n    if len(G[v]) < k[0] and (v in s):\n        s.remove(v)\n        for u in G[v]:\n            G[u].discard(v)\n            delete(u)\n\n\n\ndef main():\n    n,m,k[0] = map(int,input().split())\n    edges = [None] * (m + 1)\n    ans = [0] * m\n\n    for i in range(m):\n        u,v = map(int,input().split())\n        if G[u] is None:\n            G[u] = set()\n        if G[v] is None:\n            G[v] = set()\n        G[u].add(v)\n        G[v].add(u)\n        edges[i+1] = (u,v)\n\n    for i in range(1,n+1):\n        s.add(i)\n    \n    for i in range(1,n+1):\n        delete(i)\n    \n    i = m\n    while i > 0:\n        ans[i-1] = len(s)\n        e = edges[i]\n        G[e[0]].discard(e[1])\n        G[e[1]].discard(e[0])\n        delete(e[0])\n        delete(e[1])\n        i-=1\n    \n    for i in range(m):\n        print(ans[i])\n"
+            ]
+        },
+        "cf_contest_id": 1037,
+        "cf_index": "E",
+        "cf_points": 2250.0,
+        "cf_rating": 2200,
+        "cf_tags": [
+            "graphs"
+        ],
+        "is_description_translated": false,
+        "time_limit": {
+            "seconds": 2,
+            "nanos": 0
+        },
+        "memory_limit_bytes": 256000000,
+        "input_file": "",
+        "output_file": ""
+    },
+    {
+        "name": "1060_A. Phone Numbers",
+        "description": "TEST_DESCRIPTION",
+        "public_tests": {
+            "input": [
+                "22\n0011223344556677889988\n",
+                "11\n00000000008\n",
+                "11\n31415926535\n"
+            ],
+            "output": [
+                "2\n",
+                "1\n",
+                "0\n"
+            ]
+        },
+        "private_tests": {
+            "input": [
+                "51\n882889888888689888850888388887688788888888888858888\n",
+                "55\n7271714707719515303911625619272900050990324951111943573\n",
+                "72\n888488888888823288848804883838888888887888888888228888218488897809784868\n",
+                "65\n44542121362830719677175203560438858260878894083124543850593761845\n",
+                "54\n438283821340622774637957966575424773837418828888614203\n"
+            ],
+            "output": [
+                "4\n",
+                "0\n",
+                "6\n",
+                "5\n",
+                "4\n"
+            ]
+        },
+        "generated_tests": {
+            "input": [
+                "51\n1732111733638718702525811518175029394157760329139501\n",
+                "55\n8150965228922987149322123425550549439018369681986057802\n",
+                "72\n129108839650139854381903715683735947815379560715643428841035623040980032\n",
+                "42\n1251996236006506309908626867460855811743437\n",
+                "11\n78451611424\n"
+            ],
+            "output": [
+                "4\n",
+                "5\n",
+                "6\n",
+                "3\n",
+                "1\n"
+            ]
+        },
+        "source": 2,
+        "difficulty": 7,
+        "solutions": {
+            "language": [
+                3,
+                3,
+                3
+            ],
+            "solution": [
+                "print(min(int(input())\/\/11,input().count('8')))",
+                "print(min(int(input()) \/\/ 11, input().count(\"8\")))",
+                "n = int(input())\nprint(min(n\/\/11,input().count('8')))\n"
+            ]
+        },
+        "incorrect_solutions": {
+            "language": [
+                3,
+                3,
+                3
+            ],
+            "solution": [
+                "print(1)",
+                "print(min( int(input())\/\/8 , input().count('8')))",
+                "a = int(input())\nl = input()\nprint(l.count(\"8\"))\n"
+            ]
+        },
+        "cf_contest_id": 1060,
+        "cf_index": "A",
+        "cf_points": 500.0,
+        "cf_rating": 800,
+        "cf_tags": [
+            "brute force"
+        ],
+        "is_description_translated": false,
+        "time_limit": {
+            "seconds": 2,
+            "nanos": 0
+        },
+        "memory_limit_bytes": 512000000,
+        "input_file": "",
+        "output_file": ""
+    },
+    {
+        "name": "1101_A. Minimum Integer",
+        "description": "TEST_DESCRIPTION",
+        "public_tests": {
+            "input": [
+                "5\n2 4 2\n5 10 4\n3 10 1\n1 2 3\n4 6 5\n"
+            ],
+            "output": [
+                "6\n4\n1\n3\n10\n"
+            ]
+        },
+        "private_tests": {
+            "input": [
+                "20\n1 1000000000 2\n1 1000000000 2\n1 1000000000 2\n1 1000000000 2\n1 1000000000 2\n1 1000000000 2\n1 1000000000 2\n1 1000000000 2\n1 1000000000 2\n1 1000000000 2\n1 1000000000 2\n1 1000000000 2\n1 1000000000 2\n1 1000000000 2\n1 1000000000 2\n1 1000000000 2\n1 1000000000 2\n1 1000000000 2\n1 1000000000 2\n1 1000000000 2\n",
+                "1\n78 79 79\n",
+                "1\n6 6 6\n",
+                "20\n1 1 1\n1 999999999 1\n1 999999999 1\n1 999999999 1\n1 999999999 1\n1 999999999 1\n1 999999999 1\n1 999999999 1\n1 999999999 1\n1 999999999 1\n1 999999999 1\n1 999999999 1\n1 999999999 1\n1 999999999 1\n1 999999999 1\n1 999999999 1\n1 999999999 1\n1 999999999 1\n1 999999999 1\n1 999999999 1\n",
+                "1\n78 1000 1\n"
+            ],
+            "output": [
+                "1000000002\n1000000002\n1000000002\n1000000002\n1000000002\n1000000002\n1000000002\n1000000002\n1000000002\n1000000002\n1000000002\n1000000002\n1000000002\n1000000002\n1000000002\n1000000002\n1000000002\n1000000002\n1000000002\n1000000002\n",
+                "158\n",
+                "12\n",
+                "2\n1000000000\n1000000000\n1000000000\n1000000000\n1000000000\n1000000000\n1000000000\n1000000000\n1000000000\n1000000000\n1000000000\n1000000000\n1000000000\n1000000000\n1000000000\n1000000000\n1000000000\n1000000000\n1000000000\n",
+                "1\n"
+            ]
+        },
+        "generated_tests": {
+            "input": [
+                "1\n78 1 79\n",
+                "1\n2 6 6\n",
+                "20\n1 1 1\n1 999999999 1\n1 999999999 1\n1 999999999 1\n1 999999999 1\n1 999999999 1\n1 999999999 1\n1 999999999 1\n1 999999999 1\n1 832136582 1\n1 999999999 1\n1 999999999 1\n1 999999999 1\n1 999999999 1\n1 999999999 1\n1 999999999 1\n1 999999999 1\n1 999999999 1\n1 999999999 1\n1 999999999 1\n",
+                "1\n78 1100 1\n",
+                "1\n77 10000 2\n"
+            ],
+            "output": [
+                "79\n",
+                "12\n",
+                "2\n1000000000\n1000000000\n1000000000\n1000000000\n1000000000\n1000000000\n1000000000\n1000000000\n832136583\n1000000000\n1000000000\n1000000000\n1000000000\n1000000000\n1000000000\n1000000000\n1000000000\n1000000000\n1000000000\n",
+                "1\n",
+                "2\n"
+            ]
+        },
+        "source": 2,
+        "difficulty": 7,
+        "solutions": {
+            "language": [
+                3,
+                3,
+                3
+            ],
+            "solution": [
+                "for _ in[0]*int(input()):l,r,d=map(int,input().split());print((d>=l)*r\/\/d*d+d)",
+                "for _ in[0]*int(input()):l,r,d=map(int,input().split());print(d*(r\/\/d+1,1)[d<l])",
+                "for _ in[0]*int(input()):\n\tl,r,d=map(int,input().split())\n\tprint((d>=l)*r\/\/d*d+d)\n"
+            ]
+        },
+        "incorrect_solutions": {
+            "language": [
+                3,
+                3,
+                3
+            ],
+            "solution": [
+                "n=int(input())\n",
+                "for q in range(int(input())):\n    l,r,d=map(int,input().split())\n    print(d*((r\/\/d)+1))",
+                "n=int(input())\nfor k in range(n):\n    a,b,c=map(int,input().split())\n    print((b\/\/c)*c+c)\n"
+            ]
+        },
+        "cf_contest_id": 1101,
+        "cf_index": "A",
+        "cf_points": 0.0,
+        "cf_rating": 1000,
+        "cf_tags": [
+            "math"
+        ],
+        "is_description_translated": false,
+        "time_limit": {
+            "seconds": 1,
+            "nanos": 0
+        },
+        "memory_limit_bytes": 256000000,
+        "input_file": "",
+        "output_file": ""
+    }
+]

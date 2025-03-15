@@ -1,5 +1,6 @@
 import functools
 import json
+from collections import defaultdict
 from pathlib import Path
 from unittest import mock
 
@@ -42,6 +43,7 @@ def dummy_proc(i, num_returns):
 
 def _make_dummy_execution_result(stdout):
     return ExecutionResult(
+        key="test",
         command_results=[
             CommandResult(
                 return_code=1,
@@ -94,112 +96,11 @@ def dummy_proc_filtered(i):
     ]
 
 
-@pytest.mark.parametrize("num_returns", [1, 2], ids=["single", "multiple"])
-@pytest.mark.parametrize("num_workers", [1, 2], ids=["serial", "parallel"])
-def test_preproc(execution_config, num_returns, num_workers, tmpdir):
-    cwd = Path(tmpdir)
-    processor = functools.partial(dummy_proc, num_returns=num_returns)
-
-    expected_files = []
-    expected_commands = []
-    for i in range(10):
-        for j in range(num_returns):
-            expected_files.append((f"{i}.{j}", {"test": i}))
-            expected_commands.append(
-                {
-                    "idx": i,
-                    "sub_idx": j,
-                    "commands": [Command(command=j, timeout=1)],
-                }
-            )
-
-    execution_config.num_workers = num_workers
-    files_to_write, commands, filtered_out = entrypoints.preprocess_commands(
-        config=execution_config,
-        dir_to_use=cwd,
-        pred_list=list(range(10)),
-        preprocessor=processor,
-        preproc_returns_list=num_returns > 1,
-    )
-
-    assert filtered_out == {}
-    assert len(files_to_write) == len(expected_files)
-    assert len(commands) == len(expected_commands)
-    for actual, expected in zip(files_to_write, expected_files):
-        assert actual[0] == expected[0]
-        assert actual[1] == expected[1]
-
-    for actual, expected in zip(commands, expected_commands):
-        assert actual["key"] == (expected["idx"], expected["sub_idx"])
-        assert actual["executable"].commands == expected["commands"]
-
-
-@pytest.mark.parametrize("num_returns", [1, 2], ids=["single", "multiple"])
-@pytest.mark.parametrize("num_workers", [1, 2], ids=["serial", "parallel"])
-def test_preproc_batched(execution_config, num_returns, num_workers, tmpdir):
-    cwd = Path(tmpdir)
-    processor = functools.partial(dummy_proc, num_returns=num_returns)
-
-    expected_files = []
-    expected_commands = []
-    for i in range(10):
-        for j in range(num_returns):
-            expected_files.append((f"{i}.{j}", {"test": i}))
-            expected_commands.append(
-                {
-                    "idx": i,
-                    "sub_idx": j,
-                    "commands": [Command(command=j, timeout=1)],
-                }
-            )
-
-    execution_config.num_workers = num_workers
-    files_to_write, commands, filtered_out = entrypoints.preprocess_commands(
-        config=execution_config,
-        dir_to_use=cwd,
-        pred_list=list(range(10)),
-        preprocessor=processor,
-        preproc_returns_list=num_returns > 1,
-        batch_size=2,
-    )
-    assert filtered_out == {}
-    assert len(files_to_write) == len(expected_files)
-    assert len(commands) == len(expected_commands)
-    for actual, expected in zip(files_to_write, expected_files):
-        assert actual[0] == expected[0]
-        assert actual[1] == expected[1]
-
-    for actual, expected in zip(commands, expected_commands):
-        assert actual["key"] == (expected["idx"], expected["sub_idx"])
-        assert actual["executable"].commands == expected["commands"]
-
-
-def test_preproc_filtered_out(execution_config, tmpdir):
-    cwd = Path(tmpdir)
-    files_to_write, commands, filtered_out = entrypoints.preprocess_commands(
-        config=execution_config,
-        dir_to_use=cwd,
-        pred_list=list(range(10)),
-        preprocessor=dummy_proc_filtered,
-        preproc_returns_list=True,
-        batch_size=2,
-    )
-
-    assert len(files_to_write) == 18
-    assert len(commands) == 18
-    command_keys = {c["key"] for c in commands}
-    expected_filtered_keys = {(0, 1), (2, 0)}
-    assert not any(k in command_keys for k in expected_filtered_keys)
-    assert len(filtered_out) == 2
-    assert set(filtered_out.keys()) == {(0, 1), (2, 0)}
-    assert filtered_out[(0, 1)].last_cmd.stdout == "0"
-    assert filtered_out[(2, 0)].last_cmd.stdout == "1"
-
-
 def _preprocessor(pred):
     tree = safe_ast_parse(pred["prediction"])
     if tree is None:
         return ExecutionResult(
+            key=pred["pred_id"],
             command_results=[
                 CommandResult(
                     return_code=1,
@@ -223,7 +124,11 @@ def _preprocessor(pred):
 
 
 def _postprocessor(pred, result):
-    return {**pred, "syntax_error": result.last_cmd.stdout == "FAILED_SYNTAX"}
+    return {
+        **pred,
+        "syntax_error": result.last_cmd.stdout == "FAILED_SYNTAX",
+        **result.to_dict(),
+    }
 
 
 @pytest.fixture()
@@ -261,7 +166,7 @@ def test_execute_predictions(
     with mock.patch(
         "code_execution.utils.in_notebook", return_value=in_notebook
     ):
-        results = entrypoints.execute_predictions(
+        result = entrypoints.execute_predictions(
             execution_config,
             pred_list=execution_entrypoint_fixture,
             preprocessor=_preprocessor,
@@ -269,15 +174,22 @@ def test_execute_predictions(
             debug_dir=cwd,
         )
 
-    assert len(results) == len(execution_entrypoint_fixture)
+    assert len(result.results) == len(execution_entrypoint_fixture)
 
     pred_ids = []
     syntax_errors = []
     preds = []
-    for r in results:
+    for r in result.results:
         pred_ids.append(r["pred_id"])
         syntax_errors.append(r["syntax_error"])
         preds.append(r["prediction"])
+
+        if r["syntax_error"]:
+            assert abs(r["writing_time"] - 0.0) < 0.1
+            assert abs(r["cleanup_time"] - 0.0) < 0.1
+        else:
+            assert r["writing_time"] > 0.0
+            assert r["cleanup_time"] > 0.0
 
     assert pred_ids == list(range(8))
     assert syntax_errors == [

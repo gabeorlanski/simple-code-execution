@@ -1,9 +1,16 @@
-import pytest
-import numpy as np
+import copy
+import json
+from pathlib import Path
 from typing import Dict, List
-from code_execution.data_structures import CommandResult, ExecutionResult
+
+import numpy as np
+import pytest
+
+from code_execution.data_structures import CommandResult
+from code_execution.data_structures import ExecutionResult
 from code_execution.eval_dataset import code_contests
 from code_execution.eval_dataset.eval_utils import make_stdin_executable
+from code_execution.eval_dataset.metrics import estimate_pass_at_k
 
 
 # Mock data and fixtures
@@ -130,49 +137,31 @@ def test_filter_solutions(
     assert filtered_sols == expected_sols
 
 
-@pytest.mark.parametrize(
-    "problem, expected",
-    [
-        ({"test_types": [0, 1, 2]}, {"test_types": [0, 1, 2]}),
-        ({"test_types": [0, 1]}, {"test_types": [0, 1]}),
-        ({"test_types": [0]}, {"test_types": [0]}),
-        ({"test_types": [1]}, {"test_types": [1]}),
-        ({"test_types": [2]}, {"test_types": [2]}),
-        ({}, {"test_types": [0, 1, 2]}),
-    ],
-    ids=[
-        "all test types",
-        "public and private",
-        "only public",
-        "only private",
-        "only generated",
-        "no test types provided",
-    ],
-)
-def test_process_problem_with_all_test_types(sample_problem, problem, expected):
-    processed = code_contests.process_problem({**sample_problem, **problem})
-
-    assert "test_types" in processed
-    assert processed["test_types"] == expected["test_types"]
-
-
-def test_should_stop_early_comprehensive():
-    # Base cases
-    error_result = CommandResult(
+@pytest.fixture
+def error_result():
+    return CommandResult(
         stdout="",
         stderr="error",
         return_code=1,
         timed_out=False,
         runtime=0.1,
     )
-    timeout_result = CommandResult(
+
+
+@pytest.fixture
+def timeout_result():
+    return CommandResult(
         stdout="",
         stderr="",
         return_code=0,
         timed_out=True,
         runtime=0.1,
     )
-    success_result = CommandResult(
+
+
+@pytest.fixture
+def success_result():
+    return CommandResult(
         stdout="15\n",
         stderr="",
         return_code=0,
@@ -180,61 +169,56 @@ def test_should_stop_early_comprehensive():
         runtime=0.1,
     )
 
-    # Test basic cases
-    assert code_contests.should_stop_early(0, error_result, ["15"]) == True
-    assert code_contests.should_stop_early(0, timeout_result, ["15"]) == True
-    assert code_contests.should_stop_early(0, success_result, ["15"]) == False
 
-    # Test with ensure_real_tests_run
-    assert (
-        code_contests.should_stop_early(
-            0,
-            error_result,
-            ["15"],
-            last_real_test_idx=1,
-            ensure_real_tests_run=True,
-        )
-        == False
-    )
-    assert (
-        code_contests.should_stop_early(
-            1,
-            error_result,
-            ["15", "16"],
-            last_real_test_idx=1,
-            ensure_real_tests_run=True,
-        )
-        == True
-    )
-
-    # Test with wrong output but must run real tests
-    wrong_output = CommandResult(
+@pytest.fixture
+def wrong_output():
+    return CommandResult(
         stdout="16\n",
         stderr="",
         return_code=0,
         timed_out=False,
         runtime=0.1,
     )
-    assert (
-        code_contests.should_stop_early(
-            0,
-            wrong_output,
-            ["15"],
-            last_real_test_idx=1,
-            ensure_real_tests_run=True,
-        )
-        == False
+
+
+@pytest.mark.parametrize(
+    "test_idx, result_fixture, expected_outputs, last_real_test_idx, ensure_real_tests_run, expected",
+    [
+        # Basic cases
+        (0, "error_result", ["15"], None, False, True),
+        (0, "timeout_result", ["15"], None, False, True),
+        (0, "success_result", ["15"], None, False, False),
+        # Cases with ensure_real_tests_run
+        (0, "error_result", ["15"], 1, True, False),
+        (1, "error_result", ["15", "16"], 1, True, True),
+        # Cases with wrong output but must run real tests
+        (0, "wrong_output", ["15"], 1, True, False),
+        (2, "wrong_output", ["15"], 1, True, True),
+    ],
+)
+def test_should_stop_early_comprehensive(
+    request,
+    test_idx,
+    result_fixture,
+    expected_outputs,
+    last_real_test_idx,
+    ensure_real_tests_run,
+    expected,
+):
+    # Get the fixture result
+    result = request.getfixturevalue(result_fixture)
+
+    # Call the function with the appropriate parameters
+    actual = code_contests.should_stop_early(
+        test_idx,
+        result,
+        expected_outputs,
+        last_real_test_idx=last_real_test_idx,
+        ensure_real_tests_run=ensure_real_tests_run,
     )
-    assert (
-        code_contests.should_stop_early(
-            2,
-            wrong_output,
-            ["15"],
-            last_real_test_idx=1,
-            ensure_real_tests_run=True,
-        )
-        == True
-    )
+
+    # Assert the result
+    assert actual == expected
 
 
 def test_preprocess(
@@ -266,50 +250,74 @@ def test_preprocess(
         assert exec.commands == expected.commands
 
 
-def test_fix_test_problems():
+def test_fix_test_problem_29():
     # Test code_contests.fix_test_problem_29
     problem_29 = {
         "name": "1582_B. Luntik and Subsequences",
         "generated_tests": {
             "input": [
-                "2\n1\n1\n2\n1 2",  # Valid test
                 "2\n1\n-1\n1\n1",  # Invalid negative number
-                "2\n2\n1 2\n1\n1",  # Invalid length mismatch
+                "2\n1\n1\n2\n1 2",  # Valid test
+                "2\n2\n123\n1\n1333",  # Invalid length mismatch
             ],
             "output": ["YES", "NO", "YES"],
         },
     }
-    fixed_29 = code_contests.fix_test_problem_29(problem_29)
-    assert len(fixed_29["generated_tests"]["input"]) == 1
-    assert len(fixed_29["generated_tests"]["output"]) == 1
+    fixed_29 = code_contests.fix_test_problem_29(copy.deepcopy(problem_29))
+    assert fixed_29["generated_tests"]["input"] == [
+        problem_29["generated_tests"]["input"][1],
+    ]
+    assert fixed_29["generated_tests"]["output"] == [
+        problem_29["generated_tests"]["output"][1],
+    ]
 
+
+def test_fix_test_problem_92():
     # Test code_contests.fix_test_problem_92
     problem_92 = {
         "name": "1606_A. AB Balance",
         "private_tests": {
             "input": [
-                "aba",  # Valid
-                "abc",  # Invalid character
-                "a1b",  # Invalid character
-                "abba",  # Valid
+                "1\nab",  # Valid
+                "abc\n",  # Invalid character
+                "a\n1b",  # Invalid character
+                "1\nba\nbbbbaaa",  # Valid
             ],
             "output": ["YES", "NO", "NO", "YES"],
         },
         "generated_tests": {
             "input": [
-                "ab",  # Valid
                 "a2b",  # Invalid character
+                "5\nab",  # Valid
                 "abc",  # Invalid character
             ],
             "output": ["YES", "NO", "NO"],
         },
+        "unchanged": {
+            "input": [],
+            "output": [],
+        },
     }
-    fixed_92 = code_contests.fix_test_problem_92(problem_92)
-    assert len(fixed_92["private_tests"]["input"]) == 2
-    assert len(fixed_92["private_tests"]["output"]) == 2
-    assert len(fixed_92["generated_tests"]["input"]) == 1
-    assert len(fixed_92["generated_tests"]["output"]) == 1
+    fixed_92 = code_contests.fix_test_problem_92(copy.deepcopy(problem_92))
+    assert fixed_92["private_tests"]["input"] == [
+        problem_92["private_tests"]["input"][0],
+        problem_92["private_tests"]["input"][3],
+    ]
+    assert fixed_92["private_tests"]["output"] == [
+        problem_92["private_tests"]["output"][0],
+        problem_92["private_tests"]["output"][3],
+    ]
 
+    assert fixed_92["generated_tests"]["input"] == [
+        problem_92["generated_tests"]["input"][1],
+    ]
+    assert fixed_92["generated_tests"]["output"] == [
+        problem_92["generated_tests"]["output"][1],
+    ]
+    assert fixed_92["unchanged"] == problem_92["unchanged"]
+
+
+def test_fix_problem_3_validation():
     # Test code_contests.fix_problem_3_validation
     problem_3 = {
         "name": "1548_E. Gregor and the Two Painters",
@@ -327,202 +335,82 @@ def test_fix_test_problems():
     assert len(fixed_3["generated_tests"]["output"]) == 2
 
 
-def test_postprocess_program_result_comprehensive():
-    # Test successful case
-    success_result = ExecutionResult(
-        command_results=[
-            CommandResult(
-                stdout="15\n",
-                stderr="",
-                return_code=0,
-                timed_out=False,
-                runtime=0.1,
-            ),
-            CommandResult(
-                stdout="21\n",
-                stderr="",
-                return_code=0,
-                timed_out=False,
-                runtime=0.1,
-            ),
-        ],
-        elapsed=0.2,
-    )
+@pytest.fixture
+def real_problems():
+    data_path = Path(__file__).parent / "code_contests_data.json"
+    with data_path.open() as f:
+        data = []
+        for problem in json.load(f):
+            for k in ["solutions", "incorrect_solutions"]:
+                problem[k] = [
+                    {"language": l, "solution": s}
+                    for l, s in zip(
+                        problem[k]["language"], problem[k]["solution"]
+                    )
+                ]
+            data.append(problem)
+    yield data
 
-    result = code_contests.postprocess_program_result(
-        pred="test_solution",
-        result=success_result,
-        expected_outputs=["15", "21"],
-        test_types=[0, 1],
-    )
-    assert result["passed"] == True
-    assert result["passed_public"] == True
-    assert result["passed_private"] == True
-    assert len(result["outcomes"]) == 2
-    assert all(result["outcomes"])
 
-    # Test partial success
-    partial_result = ExecutionResult(
-        command_results=[
-            CommandResult(
-                stdout="15\n",
-                stderr="",
-                return_code=0,
-                timed_out=False,
-                runtime=0.1,
-            ),
-            CommandResult(
-                stdout="20\n",
-                stderr="",
-                return_code=0,
-                timed_out=False,
-                runtime=0.1,
-            ),
-        ],
-        elapsed=0.2,
-    )
+@pytest.mark.parametrize("should_pass", [True, False], ids=["pass", "fail"])
+@pytest.mark.parametrize(
+    "exclude_generated", [True, False], ids=["no_generated", "generated"]
+)
+def test_evaluate(real_problems, should_pass, exclude_generated):
+    problems = []
+    for problem in real_problems:
 
-    result = code_contests.postprocess_program_result(
-        pred="test_solution",
-        result=partial_result,
-        expected_outputs=["15", "21"],
-        test_types=[0, 1],
-    )
-    assert result["passed"] == False
-    assert result["passed_public"] == True
-    assert result["passed_private"] == False
+        if not should_pass:
+            problem.pop("solutions")
+            problem["solutions"] = problem.pop("incorrect_solutions")
+        else:
+            problem.pop("incorrect_solutions")
+        problems.append(problem)
 
-    # Test error case
-    error_result = ExecutionResult(
-        command_results=[
-            CommandResult(
-                stdout="",
-                stderr="error",
-                return_code=1,
-                timed_out=False,
-                runtime=0.1,
-            )
-        ],
-        elapsed=0.1,
+    metrics, preds = code_contests.evaluate(
+        problems,
+        1,
+        exclude_generated=exclude_generated,
+        force_command_timeout=True,
     )
+    assert set(metrics.keys()) == {
+        "pass@1",
+        "percent_passed",
+        "net_time",
+        "pure_exec_time",
+        "execution_time",
+        "writing_time",
+        "postprocessing_time",
+        "preprocessing_time",
+        "timestamp",
+    }
 
-    result = code_contests.postprocess_program_result(
-        pred="test_solution",
-        result=error_result,
-        expected_outputs=["15"],
-        test_types=[0],
-    )
-    assert result["passed"] == False
-    assert result["had_error"] == True
-    assert len(result["outcomes"]) == 1
-    assert not any(result["outcomes"])
+    expected = 1.0 if should_pass else 0.0
 
-    # Test timeout case
-    timeout_result = ExecutionResult(
-        command_results=[
-            CommandResult(
-                stdout="",
-                stderr="",
-                return_code=0,
-                timed_out=True,
-                runtime=2.0,
-            )
-        ],
-        elapsed=2.0,
-    )
+    expected_pass_at_k = estimate_pass_at_k(
+        [3, 3, 3], [1, 3, 3] if should_pass else [0, 0, 0], 1
+    ).mean()
 
-    result = code_contests.postprocess_program_result(
-        pred="test_solution",
-        result=timeout_result,
-        expected_outputs=["15"],
-        test_types=[0],
-    )
-    assert result["passed"] == False
-    assert result["timeout"] == True
-    assert len(result["outcomes"]) == 1
-    assert not any(result["outcomes"])
+    assert abs(metrics["pass@1"] - expected_pass_at_k) < 1e-6
+    assert abs(metrics["percent_passed"] - expected) < 1e-6
 
-    # Test mixed results with all test types
-    mixed_result = ExecutionResult(
-        command_results=[
-            CommandResult(
-                stdout="15\n",
-                stderr="",
-                return_code=0,
-                timed_out=False,
-                runtime=0.1,
-            ),
-            CommandResult(
-                stdout="21\n",
-                stderr="",
-                return_code=0,
-                timed_out=False,
-                runtime=0.1,
-            ),
-            CommandResult(
-                stdout="wrong\n",
-                stderr="",
-                return_code=0,
-                timed_out=False,
-                runtime=0.1,
-            ),
-        ],
-        elapsed=0.3,
-    )
+    assert len(preds) == len(problems)
+    for i, expected_prob in enumerate(problems):
+        result = preds[i]
+        for k, v in expected_prob.items():
+            if k in {
+                "solutions",
+            }:
+                continue
+            assert result[k] == v
 
-    result = code_contests.postprocess_program_result(
-        pred="test_solution",
-        result=mixed_result,
-        expected_outputs=["15", "21", "19"],
-        test_types=[0, 1, 2],  # public, private, generated
-    )
-    assert result["passed"] == False
-    assert result["passed_public"] == True
-    assert result["passed_private"] == True
-    assert result["passed_generated"] == False
-    assert len(result["outcomes"]) == 3
-    assert result["outcomes"] == [True, True, False]
+        assert len(result["predictions"]) == len(expected_prob["solutions"])
 
-    # Test incomplete execution (fewer results than expected outputs)
-    incomplete_result = ExecutionResult(
-        command_results=[
-            CommandResult(
-                stdout="15\n",
-                stderr="",
-                return_code=0,
-                timed_out=False,
-                runtime=0.1,
-            )
-        ],
-        elapsed=0.1,
-    )
-
-    result = code_contests.postprocess_program_result(
-        pred="test_solution",
-        result=incomplete_result,
-        expected_outputs=["15", "21"],
-        test_types=[0, 1],
-    )
-    assert result["passed"] == False
-    assert len(result["outcomes"]) == 2
-    assert result["outcomes"] == [True, False]
-
-    # Test with stdout saving limit
-    result = code_contests.postprocess_program_result(
-        pred="test_solution",
-        result=success_result,
-        expected_outputs=["15", "21"],
-        test_types=[0, 1],
-        num_stdout_save=1,
-    )
-    assert len(result["stdout"]) == 1
-
-    # Test with dictionary prediction instead of string
-    result = code_contests.postprocess_program_result(
-        pred={"solution": "test_solution", "metadata": "test"},
-        result=success_result,
-        expected_outputs=["15", "21"],
-        test_types=[0, 1],
-    )
-    assert "metadata" in result
-    assert result["metadata"] == "test"
+        for j, expected_sol in enumerate(expected_prob["solutions"]):
+            actual_sol = result["predictions"][j]
+            assert actual_sol["language"] == expected_sol["language"]
+            assert actual_sol["passed"] == should_pass
+            assert "postprocess_time" in actual_sol
+            assert "preprocess_time" in actual_sol
+            assert "writing_time" in actual_sol
+            assert "cleanup_time" in actual_sol

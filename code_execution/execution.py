@@ -1,4 +1,4 @@
-""" Module for executing code. """
+"""Module for executing code."""
 
 import concurrent.futures
 import functools
@@ -144,7 +144,7 @@ def safe_execute(
     return CommandResult(**res)
 
 
-def serial_execute_code(sample: CommandsToRun) -> ExecutionResult:
+def serial_execute_code(key, sample: CommandsToRun) -> ExecutionResult:
     """Execute a file of code.
     Args:
         sample: The sample to run.
@@ -189,6 +189,7 @@ def serial_execute_code(sample: CommandsToRun) -> ExecutionResult:
             file_contents[fn] = None
     elapsed = time.time() - t0
     return ExecutionResult(
+        key=key,
         command_results=results,
         elapsed=elapsed,
         cwd=str(working_dir_for_execution),
@@ -201,7 +202,9 @@ def execute_single(execution_dict: Dict) -> Tuple[Tuple, ExecutionResult]:
     """Executes a single program."""
     key = execution_dict["key"]
     executable = execution_dict["executable"]
-    return key, serial_execute_code(executable)
+    return key, serial_execute_code(
+        key=".".join(map(str, key)), sample=executable
+    )
 
 
 def batched_execute_code(to_run: List[Dict]) -> List[Dict]:
@@ -374,8 +377,9 @@ def _parallel_execute_code(
 def execute_commands(
     predictions,
     config: ExecutionConfig,
-) -> Tuple[float, List[ExecutionResult]]:
+) -> Tuple[float, float, List[ExecutionResult]]:
     """Executes a list of commands."""
+    start = datetime.now()
     if not LOGGING_IS_CONFIGURED:
         print(f"Executing {len(predictions):,} predictions")
     else:
@@ -396,7 +400,7 @@ def execute_commands(
 
     # Yes, this is not entirely parallel, but it makes debugging so much easier.
     if num_workers > 1:
-        elapsed, results = _parallel_execute_code(
+        pure_exec_time, results = _parallel_execute_code(
             to_run=to_run,
             max_processes=num_workers,
             num_executors=config.num_executors,
@@ -412,7 +416,7 @@ def execute_commands(
             desc="Executing Predictions",
             disable=config.disable_tqdm,
         )
-        elapsed, results = get_results_from_generator(
+        pure_exec_time, results = get_results_from_generator(
             generator=pbar_generator,
             total=len(to_run),
             target_returns_multiple=config.batched,
@@ -421,4 +425,5 @@ def execute_commands(
         )
 
         pbar_generator.close()
-    return elapsed, results
+    elapsed = (datetime.now() - start).total_seconds()
+    return elapsed, pure_exec_time, results

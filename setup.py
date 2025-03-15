@@ -12,7 +12,7 @@ setup(
     name="code_execution",
     author="Gabriel Orlanski",
     author_email="gabeorlanski@gmail.com",
-    version="0.0.1",
+    version="0.1.0",
     python_requires=">=3.10",
     description="A simple code execution library for Python",
     long_description=readme,

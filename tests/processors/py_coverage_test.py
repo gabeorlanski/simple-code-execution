@@ -5,7 +5,6 @@ from unittest import mock
 
 import pytest
 
-from code_execution.execution import serial_execute_code
 from code_execution.processors.python import py_coverage
 from code_execution.processors.utils import get_processor
 

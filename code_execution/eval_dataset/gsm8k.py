@@ -2,7 +2,6 @@ import logging
 from functools import partial
 from typing import Dict, List, Tuple
 
-
 from code_execution.data_structures import Command
 from code_execution.data_structures import Executable
 from code_execution.data_structures import ExecutionResult
@@ -46,6 +45,9 @@ def postprocess_program_result(
         "stderr": result.last_cmd.stderr,
         "stdout": result.last_cmd.stdout,
         "elapsed": result.elapsed,
+        "writing_time": result.writing_time,
+        "cleanup_time": result.cleanup_time,
+        "preprocess_time": result.preprocess_time,
     }
 
 
@@ -114,7 +116,7 @@ def evaluate(
 
     logger.info("Evaluating GSM8K dataset")
 
-    elapsed, results = execute_predictions(
+    exec_results = execute_predictions(
         pred_list=predictions,
         config=ExecutionConfig(num_workers=num_workers),
         preprocessor=partial(
@@ -126,18 +128,15 @@ def evaluate(
         ),
         postprocessor=partial(postprocess, solution_list_key=solution_list_key),
         preproc_returns_list=True,
-        return_elapsed=True,
     )
 
     num_samples = 1
     pass_counts = []
-    for r in results:
+    for r in exec_results.results:
         pass_counts.append(sum([p["passed"] for p in r["predictions"]]))
         num_samples = max(num_samples, len(r["predictions"]))
 
-    metrics = {
-        "elapsed": elapsed,
-    }
+    metrics = {**exec_results.timing_dict}
     for k in k_vals or [1, 5, 10]:
         if k > num_samples:
             break
@@ -147,4 +146,4 @@ def evaluate(
             ).mean()
         )
 
-    return metrics, results
+    return metrics, exec_results.results

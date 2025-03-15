@@ -1,4 +1,4 @@
-""" Utility functions for code execution. """
+"""Utility functions for code execution."""
 
 import asyncio
 import contextlib
@@ -12,13 +12,13 @@ import multiprocessing as mp
 import os
 import signal
 import threading
+import time
 from pathlib import Path
 from typing import Callable, Generator, List, Optional, Tuple
 
 from tqdm import tqdm
 
 from code_execution import utility_modules
-import time
 
 logger = logging.getLogger(__name__)
 
@@ -77,20 +77,26 @@ def _batched_wrapper(batch, processor, proc_returns_list):
     out = []
     for example in batch:
         idx = example["idx"]
+        start = time.time()
         result = processor(*example["args"])
+        elapsed = time.time() - start
         if proc_returns_list:
-            out.extend([((idx, i), r) for i, r in enumerate(result)])
+            out.extend([((idx, i), elapsed, r) for i, r in enumerate(result)])
         else:
-            out.append(((idx, 0), result))
+            out.append(((idx, 0), elapsed, result))
     return out
 
 
 def _normal_wrapper(arg_dict, processor, proc_returns_list):
     """Wrapper for normal processing."""
+    start = time.time()
     result = processor(*arg_dict["args"])
+    elapsed = time.time() - start
     if proc_returns_list:
-        return [((arg_dict["idx"], i), r) for i, r in enumerate(result)]
-    return ((arg_dict["idx"], 0), result)
+        return [
+            ((arg_dict["idx"], i), elapsed, r) for i, r in enumerate(result)
+        ]
+    return ((arg_dict["idx"], 0), elapsed, result)
 
 
 def wrap_processor(

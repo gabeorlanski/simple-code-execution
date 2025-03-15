@@ -1,6 +1,7 @@
-""" Data structures for code execution. """
+"""Data structures for code execution."""
 
 import dataclasses
+import datetime
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
@@ -66,6 +67,7 @@ class ExecutionResult:
     """Dataclass for the result of executing a list of commands.
 
     Args:
+        key: The key for the result.
         command_results: The results of the commands.
         elapsed: The elapsed time.
         cwd: The current working directory.
@@ -73,11 +75,15 @@ class ExecutionResult:
         expected_num_commands: The expected number of commands ran.
     """
 
+    key: str
     command_results: List[CommandResult]
     elapsed: float
     cwd: str
     tracked_files: Dict[str, str]
     expected_num_commands: int
+    writing_time: float = -1
+    cleanup_time: float = -1
+    preprocess_time: float = -1
 
     @property
     def timed_out(self) -> bool:
@@ -106,18 +112,13 @@ class ExecutionResult:
 
     def to_dict(self) -> Dict:
         """Converts the result to a dictionary."""
-        return {
-            "command_results": [
-                dataclasses.asdict(r) for r in self.command_results
-            ],
-            "cwd": self.cwd,
-            "tracked_files": self.tracked_files,
-            "elapsed": self.elapsed,
-        }
+
+        return dataclasses.asdict(self)
 
     @classmethod
     def invalid_result(
         cls,
+        key: str,
         num_commands: int = 1,
         runtime: float = 10.0,
         return_code: int = 1,
@@ -129,6 +130,7 @@ class ExecutionResult:
         Useful for when your preprocessor finds a program you want to skip
         execution for."""
         return cls(
+            key=key,
             command_results=[
                 CommandResult(
                     return_code=return_code,
@@ -207,3 +209,33 @@ class CommandsToRun:
         default_should_early_stop
     )
     stdout_postprocessor: Optional[Callable[[str], str]] = None
+
+
+@dataclasses.dataclass
+class OverallExecutionResults:
+    results: List[Dict]
+    net_time: float
+    pure_exec_time: float
+    execution_time: float
+    writing_time: float
+    postprocessing_time: float
+    preprocessing_time: float
+    timestamp: str = None
+
+    def __post_init__(self):
+        if self.timestamp is None:
+            self.timestamp = datetime.datetime.isoformat(
+                datetime.datetime.now()
+            )
+
+    @property
+    def timing_dict(self) -> Dict:
+        return {
+            "net_time": self.net_time,
+            "pure_exec_time": self.pure_exec_time,
+            "execution_time": self.execution_time,
+            "writing_time": self.writing_time,
+            "postprocessing_time": self.postprocessing_time,
+            "preprocessing_time": self.preprocessing_time,
+            "timestamp": self.timestamp,
+        }

@@ -233,7 +233,7 @@ def _process_single_chunk(
     # Clean up if in debug mode
     logger.debug("Finished execution, cleaning up...")
     cleanup_timings = {}
-    if debug_dir is not None:
+    if debug_dir is None:
         cleanup_timings = cleanup(
             files,
             rate_limit=config.write_rate_limit,

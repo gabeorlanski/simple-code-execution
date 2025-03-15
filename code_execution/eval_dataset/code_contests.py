@@ -160,7 +160,7 @@ def filter_solutions(
     return langs, sols
 
 
-def process_problem(problem: Dict) -> Dict:
+def process_problem(problem: Dict, max_tests: Optional[int] = None) -> Dict:
     if problem["name"] in NAME_TO_FIXES:
         problem = NAME_TO_FIXES[problem["name"]](problem)
     inputs = []
@@ -177,6 +177,10 @@ def process_problem(problem: Dict) -> Dict:
             outputs.append(_clean_stdout(o))
             test_types.append(test_type)
 
+    if max_tests is not None:
+        inputs = inputs[:max_tests]
+        outputs = outputs[:max_tests]
+        test_types = test_types[:max_tests]
     return {
         **problem,
         "inputs": inputs,

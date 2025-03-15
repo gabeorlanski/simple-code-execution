@@ -110,10 +110,12 @@ class ExecutionResult:
         """Whether all commands had the same return code."""
         return all(r.return_code == return_code for r in self.command_results)
 
-    def to_dict(self) -> Dict:
+    def to_dict(self, include_command_results: bool = False) -> Dict:
         """Converts the result to a dictionary."""
-
-        return dataclasses.asdict(self)
+        out = dataclasses.asdict(self)
+        if not include_command_results:
+            out.pop("command_results")
+        return out
 
     @classmethod
     def invalid_result(

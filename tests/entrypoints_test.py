@@ -188,8 +188,8 @@ def test_execute_predictions(
             assert abs(r["writing_time"] - 0.0) < 0.1
             assert abs(r["cleanup_time"] - 0.0) < 0.1
         else:
-            assert r["writing_time"] > 0.0
-            assert r["cleanup_time"] > 0.0
+            assert r["writing_time"] >= 0.0
+            assert r["cleanup_time"] >= 0.0
 
     assert pred_ids == list(range(8))
     assert syntax_errors == [

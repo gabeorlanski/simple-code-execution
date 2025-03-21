@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from functools import partial
 from typing import Dict, List, Tuple
 
@@ -38,12 +39,30 @@ def postprocess_program_result(
 ) -> bool:
     if isinstance(pred, str):
         pred = {"solution": pred}
+
+    t0 = datetime.now()
+    did_pass = (
+        not result.had_error
+        and not result.timed_out
+        and result.all_had_return_code(0)
+    )
+    elapsed = (datetime.now() - t0).total_seconds()
     return {
         **pred,
-        "passed": not result.had_error and not result.timed_out,
+        "passed": did_pass,
         "return_code": result.last_cmd.return_code,
         "stderr": result.last_cmd.stderr,
         "stdout": result.last_cmd.stdout,
+        "timeout": result.timed_out,
+        "had_error": result.had_error,
+        "timing": {
+            "writing": result.writing_time,
+            "cleanup": result.cleanup_time,
+            "cmd_exec": [c.runtime for c in result.command_results],
+            "cmd_eval": [elapsed] * len(result.command_results),
+            "preprocess": result.preprocess_time,
+            "execution": result.elapsed,
+        },
         "elapsed": result.elapsed,
         "writing_time": result.writing_time,
         "cleanup_time": result.cleanup_time,
@@ -136,7 +155,10 @@ def evaluate(
         pass_counts.append(sum([p["passed"] for p in r["predictions"]]))
         num_samples = max(num_samples, len(r["predictions"]))
 
-    metrics = {**exec_results.timing_dict}
+    metrics = {
+        "percent_passed": sum(pc > 0 for pc in pass_counts) / len(pass_counts),
+        **exec_results.timing_dict,
+    }
     for k in k_vals or [1, 5, 10]:
         if k > num_samples:
             break

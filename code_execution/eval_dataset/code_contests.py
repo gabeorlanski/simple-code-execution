@@ -2,6 +2,7 @@ import logging
 import math
 import re
 import time
+from datetime import datetime
 from functools import partial
 from typing import Dict, List, Optional, Set, Tuple
 
@@ -346,30 +347,39 @@ def postprocess_program_result(
     if isinstance(pred, str):
         pred = {"solution": pred}
 
-    outcomes = []
+    outcomes = [None] * len(expected_outputs)
+    eval_timing = [None] * len(expected_outputs)
+    command_timing = [None] * len(expected_outputs)
     passed = (
         len(expected_outputs) == len(result.command_results)
         and result.all_had_return_code(0)
         and not result.timed_out
     )
     for i, expected in enumerate(expected_outputs):
-
+        t0 = datetime.now()
         if i >= len(result):
-            outcomes.append(False)
+            outcomes[i] = False
             passed = False
+            eval_timing[i] = (datetime.now() - t0).total_seconds()
+            command_timing[i] = 0
             continue
 
         res = result.command_results[i]
+        command_timing[i] = res.runtime
         if res.had_error or res.timed_out:
-            outcomes.append(False)
+            outcomes[i] = False
+
+            eval_timing[i] = (datetime.now() - t0).total_seconds()
             continue
         test_passed = is_stdout_correct(
             res.stdout,
             expected,
         )
-        outcomes.append(test_passed)
+        outcomes[i] = test_passed
         if not test_passed:
             passed = False
+
+        eval_timing[i] = (datetime.now() - t0).total_seconds()
 
     # Check to see if we passed each test type.
     has_private = has_generated = False
@@ -393,15 +403,18 @@ def postprocess_program_result(
         "timeout": result.timed_out,
         "had_error": result.had_error,
         "return_code": result.last_cmd.return_code,
-        "writing_time": result.writing_time,
-        "cleanup_time": result.cleanup_time,
-        "preprocess_time": result.preprocess_time,
-        "exec_time": result.elapsed,
+        "timing": {
+            "writing": result.writing_time,
+            "cleanup": result.cleanup_time,
+            "cmd_exec": command_timing,
+            "cmd_eval": eval_timing,
+            "preprocess": result.preprocess_time,
+            "execution": result.elapsed,
+        },
         "passed": passed,
         "passed_public": passed_public,
         "outcomes": outcomes,
         "stderr": result.last_cmd.stderr,
-        "command_elapsed": [r.runtime for r in result.command_results],
         "stdout": stdout,
         "num_ran": len(result.command_results),
     }

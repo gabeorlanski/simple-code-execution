@@ -1,7 +1,11 @@
 import copy
 import json
+import time
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
 import numpy as np
 import pytest
@@ -410,7 +414,90 @@ def test_evaluate(real_problems, should_pass, exclude_generated):
             actual_sol = result["predictions"][j]
             assert actual_sol["language"] == expected_sol["language"]
             assert actual_sol["passed"] == should_pass
-            assert "postprocess_time" in actual_sol
-            assert "preprocess_time" in actual_sol
-            assert "writing_time" in actual_sol
-            assert "cleanup_time" in actual_sol
+            assert "timing" in actual_sol
+            assert set(actual_sol["timing"].keys()) == {
+                "writing",
+                "cleanup",
+                "cmd_exec",
+                "cmd_eval",
+                "preprocess",
+                "execution",
+            }
+
+
+@pytest.fixture
+def expected_outputs():
+    return [
+        "Hello",
+        "He ll o",
+        "He  ll  o",
+        "1.23",
+    ]
+
+
+# Test case fixtures to improve readability
+@pytest.fixture
+def successful_result(request, expected_outputs):
+    return ExecutionResult(
+        key="test1",
+        command_results=[
+            CommandResult(
+                return_code=0,
+                runtime=0.1,
+                stdout=o,
+                stderr="",
+                timed_out=False,
+            )
+            for _, o in zip(
+                range(request.param.get("num_stdout", 1)), expected_outputs
+            )
+        ],
+        elapsed=0.2,
+        cwd="/tmp",
+        tracked_files={},
+        expected_num_commands=request.param.get("num_stdout", 1),
+        writing_time=0.05,
+        cleanup_time=0.03,
+        preprocess_time=0.02,
+    )
+
+
+@pytest.mark.parametrize(
+    "successful_result",
+    [
+        {"num_stdout": 1},
+        {"num_stdout": 10},
+    ],
+    ids=["single", "multiple"],
+    indirect=True,
+)
+def test_postprocess_result(successful_result, expected_outputs):
+    expected_stdout = [
+        o for _, o in zip(successful_result.command_results, expected_outputs)
+    ]
+    actual = code_contests.postprocess_program_result(
+        {"solution": "test"},
+        successful_result,
+        expected_outputs=expected_stdout,
+        test_types=[0] * len(expected_outputs),
+    )
+
+    assert actual["solution"] == "test"
+    assert actual["passed"]
+    assert "passed_generated" not in actual
+    assert "passed_private" not in actual
+
+    assert actual["outcomes"] == [True] * len(expected_stdout)
+    assert len(actual["timing"]["cmd_eval"]) == len(expected_stdout)
+    assert actual["timing"]["cmd_exec"] == [0.1] * len(expected_stdout)
+    assert actual["stdout"] == expected_stdout
+
+    assert actual["stderr"] == ""
+    assert not actual["timeout"]
+    assert not actual["had_error"]
+    assert actual["return_code"] == 0
+    assert actual["timing"]["writing"] == successful_result.writing_time
+    assert actual["timing"]["cleanup"] == successful_result.cleanup_time
+    assert actual["timing"]["preprocess"] == successful_result.preprocess_time
+    assert actual["timing"]["execution"] == successful_result.elapsed
+    assert actual["num_ran"] == len(expected_stdout)

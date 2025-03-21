@@ -311,6 +311,8 @@ def _parallel_execute_code(
     last_log = last_chunk_log = 0
     chunks_finished = last_pct = 0
     chunks_completed = 0
+
+    t0 = time.time()
     with mp.Pool(processes=num_executors) as pool:
         for result in pool.imap_unordered(threaded_fn, chunks):
             results.extend(result)
@@ -349,7 +351,7 @@ def _parallel_execute_code(
                 interval_start = time.time()
             if chunks_completed % 10 == 0:
                 logger.debug(
-                    f"{len(results):>9,}/{total_commands:<9,} total finished in {seconds_to_human(t1 - start_time)}"
+                    f"{len(results):>9,}/{total_commands:<9,} total finished in {seconds_to_human(t0 - start_time)}"
                 )
                 one_min_cpu, _, fifteen_min_cpu = [
                     x / psutil.cpu_count() for x in psutil.getloadavg()

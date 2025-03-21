@@ -422,6 +422,7 @@ def test_evaluate(real_problems, should_pass, exclude_generated):
                 "cmd_eval",
                 "preprocess",
                 "execution",
+                "postprocess",
             }
 
 

@@ -1,7 +1,6 @@
 import logging
 import math
 import re
-import time
 from datetime import datetime
 from functools import partial
 from typing import Dict, List, Optional, Set, Tuple
@@ -343,7 +342,7 @@ def postprocess_program_result(
     test_types: List[int],
     num_stdout_save: int = None,
 ) -> bool:
-    start = time.time()
+    start = datetime.now()
     if isinstance(pred, str):
         pred = {"solution": pred}
 
@@ -410,6 +409,7 @@ def postprocess_program_result(
             "cmd_eval": eval_timing,
             "preprocess": result.preprocess_time,
             "execution": result.elapsed,
+            "postprocess": (datetime.now() - start).total_seconds(),
         },
         "passed": passed,
         "passed_public": passed_public,
@@ -424,7 +424,7 @@ def postprocess_program_result(
     if has_private:
         out_dict["passed_private"] = passed_private
 
-    out_dict["postprocess_time"] = time.time() - start
+    out_dict["timing"]["postprocess"] = (datetime.now() - start).total_seconds()
     return out_dict
 
 

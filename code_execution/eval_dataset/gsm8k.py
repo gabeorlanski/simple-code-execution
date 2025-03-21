@@ -128,6 +128,7 @@ def evaluate(
     solution_str_key: str = "solution",
     solution_list_key: str = "solutions",
     k_vals: List[int] = None,
+    execution_kwargs: Dict = None,
 ) -> Tuple[Dict, List[Dict]]:
     logger.debug("Adding index column to dataset")
     for idx in range(len(predictions)):
@@ -137,7 +138,9 @@ def evaluate(
 
     exec_results = execute_predictions(
         pred_list=predictions,
-        config=ExecutionConfig(num_workers=num_workers),
+        config=ExecutionConfig(
+            num_workers=num_workers, **(execution_kwargs or {})
+        ),
         preprocessor=partial(
             preprocess,
             timeout=timeout,

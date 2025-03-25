@@ -215,4 +215,5 @@ def test_evaluate():
                 "cmd_eval",
                 "preprocess",
                 "execution",
+                "postprocess",
             }

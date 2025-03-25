@@ -503,6 +503,7 @@ def evaluate(
     python_command: str = "python3",
     force_command_timeout: bool = False,
     num_stdout_save: int = None,
+    default_mem_limit: int = 2 * 1024 * 1024 * 1024,
 ) -> Tuple[Dict, List[Dict]]:
     """Evaluates predictions for CodeContests dataset.
 
@@ -569,6 +570,7 @@ def evaluate(
             ensure_real_tests_run=ensure_real_tests_run,
             python_command=python_command,
             force_command_timeout=force_command_timeout,
+            default_mem_limit=default_mem_limit,
         ),
         postprocessor=partial(
             postprocess,

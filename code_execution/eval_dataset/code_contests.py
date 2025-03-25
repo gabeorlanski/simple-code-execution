@@ -252,6 +252,7 @@ def preprocess(
     ensure_real_tests_run: bool = False,
     python_command: str = "python3",
     force_command_timeout: bool = False,
+    default_mem_limit: int = 2 * 1024 * 1024 * 1024,
 ) -> List[Executable]:
 
     inputs = problem["inputs"]
@@ -283,12 +284,14 @@ def preprocess(
         except ValueError:
             # There are no generated tests.
             last_real_test_idx = None
-    if not disable_memory_limit and problem["memory_limit_bytes"] > 0:
-        mem_code = eval_utils.get_mem_limit_code(
-            str(problem["memory_limit_bytes"]), "\n\n"
-        )
-    else:
+    if disable_memory_limit:
         mem_code = ""
+    else:
+        if problem["memory_limit_bytes"] > 0:
+            mem_bytes = problem["memory_limit_bytes"]
+        else:
+            mem_bytes = default_mem_limit
+        mem_code = eval_utils.get_mem_limit_code(str(mem_bytes), "\n\n")
 
     if max_commands is not None:
         inputs = inputs[:max_commands]

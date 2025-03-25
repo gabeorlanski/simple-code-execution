@@ -62,11 +62,8 @@ def postprocess_program_result(
             "cmd_eval": [elapsed] * len(result.command_results),
             "preprocess": result.preprocess_time,
             "execution": result.elapsed,
+            "postprocess": elapsed,
         },
-        "elapsed": result.elapsed,
-        "writing_time": result.writing_time,
-        "cleanup_time": result.cleanup_time,
-        "preprocess_time": result.preprocess_time,
     }
 
 

@@ -362,7 +362,7 @@ def postprocess_program_result(
         if i >= len(result):
             outcomes[i] = False
             passed = False
-            eval_timing[i] = (datetime.now() - t0).total_seconds()
+            eval_timing[i] = 0
             command_timing[i] = 0
             continue
 

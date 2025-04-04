@@ -52,11 +52,7 @@ def make_stdin_executable(
     commands = [
         Command(
             command=c,
-            timeout=(
-                max(first_command_timeout, command_timeout)
-                if i == 0
-                else command_timeout
-            ),
+            timeout=(first_command_timeout if i == 0 else command_timeout),
             stdin=stdin,
         )
         for i, (stdin, c) in enumerate(zip(inputs, commands))

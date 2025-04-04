@@ -1,4 +1,4 @@
-""" This file contains the configuration for the code execution module. """
+"""This file contains the configuration for the code execution module."""
 
 import logging
 from dataclasses import dataclass

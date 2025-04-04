@@ -241,7 +241,7 @@ def should_stop_early(
 def preprocess(
     problem: Dict,
     command_timeout: float,
-    first_command_timeout: Optional[float],
+    first_command_timeout: float,
     early_stopping: bool = False,
     disable_memory_limit: bool = False,
     solution_str_key: str = "solution",
@@ -295,13 +295,13 @@ def preprocess(
 
     if max_commands is not None:
         inputs = inputs[:max_commands]
-
-    if problem.get("time_limit") is not None and not force_command_timeout:
+    if force_command_timeout or problem.get("time_limit") is None:
+        time_limit = command_timeout
+    else:
         time_limit = problem["time_limit"]
         time_limit = time_limit["seconds"] + time_limit["nanos"] / 1e9
         time_limit = max(time_limit, command_timeout)
-    else:
-        time_limit = command_timeout
+        first_command_timeout = max(first_command_timeout, time_limit)
 
     if early_stopping:
         early_stop_fn = partial(
@@ -329,7 +329,7 @@ def preprocess(
             early_stop_fn=early_stop_fn,
             ensure_all_run=False,
             tracked_files=[],
-            first_command_timeout=first_command_timeout or 0,
+            first_command_timeout=first_command_timeout,
             command_timeout=time_limit,
             stdout_postprocess_fn=_clean_stdout,
         )

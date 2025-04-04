@@ -351,7 +351,7 @@ def _parallel_execute_code(
                 interval_start = time.time()
             if chunks_completed % 10 == 0:
                 logger.debug(
-                    f"{len(results):>9,}/{total_commands:<9,} total finished in {seconds_to_human(t0 - start_time)}"
+                    f"{len(results):>9,}/{total_commands:<9,} total finished in {seconds_to_human(time.time() - start_time)}"
                 )
                 one_min_cpu, _, fifteen_min_cpu = [
                     x / psutil.cpu_count() for x in psutil.getloadavg()

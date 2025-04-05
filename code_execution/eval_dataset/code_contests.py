@@ -20,6 +20,14 @@ from code_execution.execution import ExecutionConfig
 
 logger = logging.getLogger(__name__)
 
+REQUIRED_EXECUTION_KEYS = {
+    "inputs",
+    "outputs",
+    "test_types",
+    "memory_limit_bytes",
+    "time_limit",
+}
+
 
 # Adapted from https://github.com/Codium-ai/AlphaCodium/blob/main/alpha_codium/code_contests/data/prepare_and_clean_dataset.py#L152
 def fix_test_problem_29(problem):

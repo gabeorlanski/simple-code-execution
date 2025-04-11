@@ -357,24 +357,13 @@ def postprocess_program_result(
     if isinstance(pred, str):
         pred = {"solution": pred}
 
-    outcomes = [None] * len(expected_outputs)
+    outcomes = [False] * len(expected_outputs)
     eval_timing = [None] * len(expected_outputs)
     command_timing = [None] * len(expected_outputs)
-    passed = (
-        len(expected_outputs) == len(result.command_results)
-        and result.all_had_return_code(0)
-        and not result.timed_out
-    )
-    for i, expected in enumerate(expected_outputs):
+    passed = False
+    for i, res in enumerate(result.command_results):
         t0 = datetime.now()
-        if i >= len(result):
-            outcomes[i] = False
-            passed = False
-            eval_timing[i] = 0
-            command_timing[i] = 0
-            continue
 
-        res = result.command_results[i]
         command_timing[i] = res.runtime
         if res.had_error or res.timed_out:
             outcomes[i] = False
@@ -383,30 +372,38 @@ def postprocess_program_result(
             continue
         test_passed = is_stdout_correct(
             res.stdout,
-            expected,
+            expected_outputs[i],
         )
         outcomes[i] = test_passed
-        if not test_passed:
-            passed = False
 
         eval_timing[i] = (datetime.now() - t0).total_seconds()
 
+    passed = all(outcomes)
+
     # Check to see if we passed each test type.
-    has_private = has_generated = False
+    has_private = 1 in test_types
+    has_generated = 2 in test_types
+    has_public = 0 in test_types
     passed_public = passed_private = passed_generated = True
     for t_type, outcome in zip(test_types, outcomes):
         if t_type == 0:
             passed_public &= outcome
         elif t_type == 1:
-            has_private = True
             passed_private &= outcome
         elif t_type == 2:
-            has_generated = True
             passed_generated &= outcome
 
-    stdout = [r.stdout for r in result.command_results]
+    # Truncate outcomes and other num command results to the length of those ran.
+    # We do this AFTER checking if we passed each test type because we want to
+    # include all outcomes in the output.
+    outcomes = outcomes[: len(result.command_results)]
+    eval_timing = eval_timing[: len(result.command_results)]
+    command_timing = command_timing[: len(result.command_results)]
+
+    cmd_res = result.command_results
     if num_stdout_save is not None:
-        stdout = stdout[-num_stdout_save:]
+        cmd_res = cmd_res[-num_stdout_save:]
+    stdout = [r.stdout for r in cmd_res]
 
     out_dict = {
         **pred,
@@ -423,13 +420,13 @@ def postprocess_program_result(
             "postprocess": (datetime.now() - start).total_seconds(),
         },
         "passed": passed,
-        "passed_public": passed_public,
         "outcomes": outcomes,
         "stderr": result.last_cmd.stderr,
         "stdout": stdout,
         "num_ran": len(result.command_results),
     }
-
+    if has_public:
+        out_dict["passed_public"] = passed_public
     if has_generated:
         out_dict["passed_generated"] = passed_generated
     if has_private:

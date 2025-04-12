@@ -308,8 +308,8 @@ def preprocess(
     else:
         time_limit = problem["time_limit"]
         time_limit = time_limit["seconds"] + time_limit["nanos"] / 1e9
-        time_limit = min(time_limit, command_timeout)
-        first_command_timeout = min(first_command_timeout, time_limit)
+        time_limit = max(time_limit, command_timeout)
+        first_command_timeout = max(first_command_timeout, time_limit)
 
     if early_stopping:
         early_stop_fn = partial(

@@ -7,9 +7,9 @@ from code_execution.data_structures import Command
 from code_execution.data_structures import Executable
 from code_execution.data_structures import ExecutionResult
 from code_execution.entrypoints import execute_predictions
+from code_execution.eval_dataset import eval_utils
 from code_execution.eval_dataset.metrics import estimate_pass_at_k
 from code_execution.execution import ExecutionConfig
-from code_execution.eval_dataset import eval_utils
 
 logger = logging.getLogger(__name__)
 

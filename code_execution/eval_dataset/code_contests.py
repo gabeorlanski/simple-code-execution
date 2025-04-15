@@ -1,8 +1,8 @@
+import functools
 import logging
 import math
 import re
 from datetime import datetime
-from functools import partial
 from typing import Dict, List, Optional, Set, Tuple
 
 import numpy as np
@@ -312,14 +312,18 @@ def preprocess(
         first_command_timeout = max(first_command_timeout, time_limit)
 
     if early_stopping:
-        early_stop_fn = partial(
+        early_stop_fn = functools.partial(
             should_stop_early,
             expected_out=problem["outputs"][: len(inputs)],
             ensure_real_tests_run=ensure_real_tests_run,
             last_real_test_idx=last_real_test_idx,
         )
     else:
-        early_stop_fn = default_should_early_stop
+        early_stop_fn = functools.partial(
+            default_should_early_stop,
+            expected_rtr_code=None,
+            stop_for_error=False,
+        )
 
     out = []
     for solution in problem[solution_list_key]:
@@ -335,7 +339,6 @@ def preprocess(
             inputs=inputs,
             commands=[python_command, "main.py"],
             early_stop_fn=early_stop_fn,
-            ensure_all_run=False,
             tracked_files=[],
             first_command_timeout=first_command_timeout,
             command_timeout=time_limit,
@@ -561,7 +564,7 @@ def evaluate(
         config=ExecutionConfig(
             num_workers=num_workers, **(execution_kwargs or {})
         ),
-        preprocessor=partial(
+        preprocessor=functools.partial(
             preprocess,
             first_command_timeout=first_command_timeout,
             command_timeout=command_timeout,
@@ -577,7 +580,7 @@ def evaluate(
             force_command_timeout=force_command_timeout,
             default_mem_limit=default_mem_limit,
         ),
-        postprocessor=partial(
+        postprocessor=functools.partial(
             postprocess,
             exclude_private=exclude_private,
             exclude_generated=exclude_generated,

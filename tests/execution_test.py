@@ -1,3 +1,4 @@
+import functools
 import logging
 import math
 from pathlib import Path
@@ -10,6 +11,7 @@ from code_execution import execution
 from code_execution.configs import ExecutionConfig
 from code_execution.data_structures import Command
 from code_execution.data_structures import CommandsToRun
+from code_execution.data_structures import default_should_early_stop
 
 
 def make_command(program, cwd: Path):
@@ -246,12 +248,10 @@ def make_ignore_error_test(
     pass_cmd = Command(
         command=["python", "pass.py"],
         timeout=1,
-        ignore_error=ignore_errors == "cmd",
     )
     fail_cmd = Command(
         command=["python", "fail.py"],
         timeout=1,
-        ignore_error=ignore_errors == "cmd",
     )
     commands = []
     first_fail = None
@@ -267,13 +267,19 @@ def make_ignore_error_test(
         cwd=cwd,
         commands=commands,
         tracked_files=[],
-        ensure_all_run=ignore_errors == "all",
+        should_early_stop=functools.partial(
+            default_should_early_stop,
+            expected_rtr_code=0 if ignore_errors == "none" else None,
+            stop_for_error=ignore_errors == "none",
+            stop_for_timeout=ignore_errors == "none",
+            stop_for_timeout_code=ignore_errors == "none",
+        ),
     )
 
     return first_fail, command_to_run
 
 
-@pytest.mark.parametrize("ignore_errors", ["all", "cmd", "none"])
+@pytest.mark.parametrize("ignore_errors", ["all", "none"])
 @pytest.mark.parametrize("cmds", ["PPP", "FFF", "PFP", "F", "P", "FPP"])
 def test_execute_ignore_errors(
     passing_program, error_program, tmpdir, ignore_errors, cmds

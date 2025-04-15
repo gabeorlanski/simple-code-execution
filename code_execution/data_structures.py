@@ -15,14 +15,12 @@ class Command:
         timeout: The timeout for the command. If not set, the default timeout is used.
         num_times: Number of times to execute the command.
         stdin: The stdin for the command.
-        ignore_error: Whether to ignore errors and continue execution.
     """
 
     command: List[str]
     timeout: Optional[float] = None
     num_times: int = 1
     stdin: List[str] = dataclasses.field(default_factory=list)
-    ignore_error: bool = False
 
 
 @dataclasses.dataclass(frozen=True)
@@ -156,8 +154,24 @@ class ExecutionResult:
         return len(self.command_results)
 
 
-def default_should_early_stop(*_, **_k) -> bool:
+def default_should_early_stop(
+    cmd_idx: int,
+    res: CommandResult,
+    expected_rtr_code: Optional[int] = 0,
+    stop_for_error: bool = True,
+    stop_for_timeout: bool = True,
+    **_k,
+) -> bool:
+    _ = cmd_idx
     _ = _k
+    if stop_for_error and res.had_error:
+        return True
+    if stop_for_timeout and res.timed_out:
+        return True
+    if expected_rtr_code is not None and res.return_code != expected_rtr_code:
+        return True
+    if res.had_unexpected_error:
+        return True
     return False
 
 
@@ -169,15 +183,12 @@ class Executable:
         files: The files to write.
         commands: The commands to run.
         tracked_files: The files to get contents of after execution.
-        ensure_all_run: Whether to ignore errors and continue. This will override
-            individual command settings. Default is False.
         should_early_stop: A function that takes the index of the command and the result, returning a bool if the execution should stop early. THIS MUST BE PICKLEABLE
     """
 
     files: Dict[str, str]
     commands: List[Command]
     tracked_files: List[str] = dataclasses.field(default_factory=list)
-    ensure_all_run: bool = False
     should_early_stop: Callable[[int, CommandResult], bool] = (
         default_should_early_stop
     )
@@ -199,14 +210,11 @@ class CommandsToRun:
         cwd: The current working directory.
         commands: The commands to run.
         tracked_files: The files to get contents of after execution.
-        ensure_all_run: Whether to ignore errors and continue. This will override
-            individual command settings. Default is False.
     """
 
     cwd: Path
     commands: List[Command]
     tracked_files: List[str] = dataclasses.field(default_factory=list)
-    ensure_all_run: bool = False
     should_early_stop: Callable[[int, CommandResult], bool] = (
         default_should_early_stop
     )

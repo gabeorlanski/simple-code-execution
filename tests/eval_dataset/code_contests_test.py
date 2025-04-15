@@ -257,7 +257,6 @@ class TestCodeContestsExecution:
                 inputs=multiple_solutions_problem["inputs"],
                 commands=["python3", "main.py"],
                 early_stop_fn=lambda **_: False,
-                ensure_all_run=False,
                 tracked_files=[],
                 first_command_timeout=3.0 if force_command_timeout else 1.0,
                 command_timeout=2.0 if force_command_timeout else 1.0,

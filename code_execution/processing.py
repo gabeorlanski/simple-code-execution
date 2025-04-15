@@ -147,7 +147,6 @@ def preprocess_commands(
                     cwd=pred_dir.resolve().absolute(),
                     commands=cmds,
                     tracked_files=exec_command.tracked_files,
-                    ensure_all_run=exec_command.ensure_all_run,
                     should_early_stop=exec_command.should_early_stop,
                     stdout_postprocessor=exec_command.stdout_postprocessor,
                 ),

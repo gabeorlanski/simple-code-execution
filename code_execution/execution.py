@@ -170,14 +170,7 @@ def serial_execute_code(key, sample: CommandsToRun) -> ExecutionResult:
             stdout_postprocessor=sample.stdout_postprocessor,
         )
         results.append(res)
-        if res.timed_out or res.return_code != 0 or res.had_unexpected_error:
-            if sample.ensure_all_run:
-                continue
-            if command.ignore_error:
-                continue
-
-            break
-        elif sample.should_early_stop(cidx, res):
+        if sample.should_early_stop(cidx, res):
             break
 
     file_contents = {}

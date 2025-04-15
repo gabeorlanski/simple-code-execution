@@ -23,7 +23,6 @@ def make_stdin_executable(
     commands: List[str] | List[List[str]],
     first_command_timeout: float,
     early_stop_fn: Callable,
-    ensure_all_run: bool = False,
     tracked_files: List[str] = None,
     command_timeout: float = 2.0,
     stdout_postprocess_fn: Optional[Callable[[str], str]] = None,
@@ -35,7 +34,6 @@ def make_stdin_executable(
         inputs: The inputs.
         commands: The commands.
         early_stop_fn: The early stop function.
-        ensure_all_run: Whether to ensure all commands are run.
         tracked_files: The tracked files.
         first_command_timeout: The timeout for the first command. If not set, the default timeout is used.
         command_timeout: The timeout for the commands.
@@ -61,7 +59,6 @@ def make_stdin_executable(
     return Executable(
         files=files,
         commands=commands,
-        ensure_all_run=ensure_all_run,
         tracked_files=tracked_files or [],
         should_early_stop=early_stop_fn,
         stdout_postprocessor=stdout_postprocess_fn,

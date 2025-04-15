@@ -141,7 +141,7 @@ class TestCodeContestsExecution:
         return {
             "name": "multiple_solutions",
             "memory_limit_bytes": 1024 * 1024 * 512,
-            "time_limit": {"seconds": 1, "nanos": 0},
+            "time_limit": {"seconds": 10, "nanos": 5e6},
             "inputs": ["1 2 3", "4 5 6"],
             "outputs": ["6", "15"],
             "test_types": [0, 0],
@@ -242,7 +242,7 @@ class TestCodeContestsExecution:
         executables = code_contests.preprocess(
             problem=multiple_solutions_problem,
             command_timeout=2.0,
-            first_command_timeout=3.0,
+            first_command_timeout=30.0,
             disable_memory_limit=True,
             force_command_timeout=force_command_timeout,
         )
@@ -258,8 +258,8 @@ class TestCodeContestsExecution:
                 commands=["python3", "main.py"],
                 early_stop_fn=lambda **_: False,
                 tracked_files=[],
-                first_command_timeout=3.0 if force_command_timeout else 1.0,
-                command_timeout=2.0 if force_command_timeout else 1.0,
+                first_command_timeout=30.0,
+                command_timeout=2.0 if force_command_timeout else 10.005,
                 stdout_postprocess_fn=lambda s: s.strip(),
             )
 

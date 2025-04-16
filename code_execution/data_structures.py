@@ -158,14 +158,11 @@ def default_should_early_stop(
     cmd_idx: int,
     res: CommandResult,
     expected_rtr_code: Optional[int] = 0,
-    stop_for_error: bool = True,
     stop_for_timeout: bool = True,
     **_k,
 ) -> bool:
     _ = cmd_idx
     _ = _k
-    if stop_for_error and res.had_error:
-        return True
     if stop_for_timeout and res.timed_out:
         return True
     if expected_rtr_code is not None and res.return_code != expected_rtr_code:

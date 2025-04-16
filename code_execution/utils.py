@@ -14,7 +14,7 @@ import signal
 import threading
 import time
 from pathlib import Path
-from typing import Callable, Generator, List, Optional, Tuple
+from typing import Callable, Dict, Generator, List, Optional, Tuple
 
 from tqdm import tqdm
 
@@ -303,6 +303,7 @@ def run_in_parallel(
     chunk_size: int = 1,
     log_freq: int = 500,
     target_returns_multiple: bool = False,
+    tqdm_kwargs: Optional[Dict] = None,
 ) -> List:
     """Runs a function in parallel.
 
@@ -321,7 +322,8 @@ def run_in_parallel(
             to 500.
         target_returns_multiple (bool, optional): If the target returns multiple
             so that `.extend` is used instead of `.append`. Defaults to False.
-        quiet (bool, optional): Whether to suppress logging. Defaults to False.
+        tqdm_kwargs (Optional[Dict], optional): Additional keyword arguments to
+            pass to tqdm. Defaults to None.
 
     Returns:
         List: The results of `target(a)` for each `a` in `args`.
@@ -338,6 +340,7 @@ def run_in_parallel(
         total=len(args),
         desc=desc,
         disable=disable_tqdm,
+        **(tqdm_kwargs or {}),
     )
 
     num_workers = min(num_workers, len(args))

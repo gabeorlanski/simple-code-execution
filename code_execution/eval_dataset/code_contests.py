@@ -321,7 +321,7 @@ def preprocess(
     else:
         early_stop_fn = functools.partial(
             default_should_early_stop,
-            expected_rtr_code=0,
+            expected_rtr_code=None,
         )
 
     out = []

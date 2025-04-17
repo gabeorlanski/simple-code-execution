@@ -162,6 +162,7 @@ def default_should_early_stop(
     **_k,
 ) -> bool:
     _ = cmd_idx
+    _ = _k
     if stop_for_timeout and res.timed_out:
         return True
     if expected_rtr_code is not None and res.return_code != expected_rtr_code:

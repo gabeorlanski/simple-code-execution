@@ -8,7 +8,9 @@ Installation
 
 .. code-block:: bash
 
-    pip install simple-code-execution
+    git clone https://github.com/gabeorlanski/simple-code-execution.git
+    cd simple-code-execution
+    pip install -e .
 
 Basic Usage
 -----------

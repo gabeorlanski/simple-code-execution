@@ -87,7 +87,7 @@ jobs:
     steps:
       - name: Debug Build Directory
         run: |
-          ls -la .
+          ls .
           ls -la docs/
           ls -la docs/_build/
           ls -la docs/_build/html/

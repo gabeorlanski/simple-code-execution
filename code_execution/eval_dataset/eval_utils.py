@@ -12,7 +12,7 @@ from code_execution.data_structures import default_should_early_stop
 from code_execution.entrypoints import execute_predictions
 from code_execution.eval_dataset.metrics import estimate_pass_at_k
 from code_execution.execution import ExecutionConfig
-from code_execution.utils import get_mem_limit_code
+from code_execution.utils.utils import get_mem_limit_code
 
 logger = logging.getLogger(__name__)
 

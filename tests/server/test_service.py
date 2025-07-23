@@ -1,6 +1,7 @@
 """Unit tests for the execution service."""
 
 from unittest.mock import AsyncMock
+from unittest.mock import MagicMock
 from unittest.mock import patch
 
 import pytest
@@ -21,22 +22,22 @@ class TestDetectExecutableType:
         request = ExecuteRequest(
             files={"test.py": "print('hello')"},
             commands=[Command(command=["python", "test.py"])],
-            executable_type="subprocess"
+            executable_type="subprocess",
         )
-        
+
         result = ExecutionService.detect_executable_type(request)
-        
+
         assert result == "subprocess"
 
     def test_detect_executable_type_default(self):
         """Test default executable type when none specified."""
         request = ExecuteRequest(
             files={"test.py": "print('hello')"},
-            commands=[Command(command=["python", "test.py"])]
+            commands=[Command(command=["python", "test.py"])],
         )
-        
+
         result = ExecutionService.detect_executable_type(request)
-        
+
         assert result == "subprocess"
 
     def test_detect_executable_type_unsupported(self):
@@ -44,11 +45,11 @@ class TestDetectExecutableType:
         request = ExecuteRequest(
             files={"test.py": "print('hello')"},
             commands=[Command(command=["python", "test.py"])],
-            executable_type="unsupported_type"
+            executable_type="unsupported_type",
         )
-        
+
         result = ExecutionService.detect_executable_type(request)
-        
+
         assert result == "subprocess"
 
 
@@ -59,39 +60,38 @@ class TestValidateRequest:
         """Test validation of valid request."""
         request = ExecuteRequest(
             files={"test.py": "print('hello')"},
-            commands=[Command(command=["python", "test.py"])]
+            commands=[Command(command=["python", "test.py"])],
         )
-        
+
         # Should not raise any exception
         ExecutionService.validate_request(request)
 
     def test_validate_request_no_commands(self):
         """Test validation fails with no commands."""
         request = ExecuteRequest(
-            files={"test.py": "print('hello')"},
-            commands=[]
+            files={"test.py": "print('hello')"}, commands=[]
         )
-        
-        with pytest.raises(ValueError, match="At least one command is required"):
+
+        with pytest.raises(
+            ValueError, match="At least one command is required"
+        ):
             ExecutionService.validate_request(request)
 
     def test_validate_request_no_files_with_file_commands(self):
         """Test validation warning when commands reference files but no files provided."""
         request = ExecuteRequest(
-            files={},
-            commands=[Command(command=["python", "script.py"])]
+            files={}, commands=[Command(command=["python", "script.py"])]
         )
-        
+
         # Should not raise exception, but may log warning
         ExecutionService.validate_request(request)
 
     def test_validate_request_valid_no_file_references(self):
         """Test validation with commands that don't reference files."""
         request = ExecuteRequest(
-            files={},
-            commands=[Command(command=["echo", "hello"])]
+            files={}, commands=[Command(command=["echo", "hello"])]
         )
-        
+
         # Should not raise any exception
         ExecutionService.validate_request(request)
 
@@ -102,7 +102,9 @@ class TestExecuteRequest:
     @pytest.mark.asyncio
     @patch("code_execution.server.service.RunnerRegistry.get_runner")
     @patch("code_execution.server.service.get_concurrency_limiter")
-    async def test_execute_request_success(self, mock_get_limiter, mock_get_runner):
+    async def test_execute_request_success(
+        self, mock_get_limiter, mock_get_runner
+    ):
         """Test successful request execution."""
         # Setup mocks
         mock_result = ExecutableResult(
@@ -112,18 +114,19 @@ class TestExecuteRequest:
                     return_code=0,
                     runtime=0.1,
                     timed_out=False,
-                    stderr=""
+                    stderr="",
                 )
             ],
             elapsed=0.12,
-            tracked_files={}
+            tracked_files={},
         )
         mock_runner = AsyncMock(return_value=mock_result)
         mock_get_runner.return_value = mock_runner
-        
+
         # Mock concurrency limiter
-        mock_limiter = AsyncMock()
-        mock_limiter.acquire.return_value = "exec_123"
+        mock_limiter = MagicMock()
+        mock_limiter.acquire = AsyncMock(return_value="exec_123")
+        mock_limiter.release = AsyncMock()
         mock_limiter.get_queue_info.return_value = {"current_executions": 1}
         mock_get_limiter.return_value = mock_limiter
 
@@ -131,7 +134,7 @@ class TestExecuteRequest:
         request = ExecuteRequest(
             files={"hello.py": "print('Hello World!')"},
             commands=[Command(command=["python", "hello.py"], timeout=30)],
-            executable_type="subprocess"
+            executable_type="subprocess",
         )
 
         # Execute request
@@ -142,9 +145,9 @@ class TestExecuteRequest:
         assert metadata["execution_id"] == "exec_123"
         mock_get_runner.assert_called_once_with("subprocess")
         mock_runner.assert_called_once()
-        mock_limiter.acquire.assert_called_once_with(priority=5)  # default priority
+        mock_limiter.acquire.assert_called_once()
         mock_limiter.release.assert_called_once_with("exec_123")
-        
+
         # Verify the executable passed to runner
         called_executable = mock_runner.call_args[0][0]
         assert isinstance(called_executable, SubprocessExecutable)
@@ -157,12 +160,13 @@ class TestExecuteRequest:
         """Test request execution with validation error."""
         # Create invalid request
         request = ExecuteRequest(
-            files={"test.py": "print('test')"},
-            commands=[]  # No commands
+            files={"test.py": "print('test')"}, commands=[]  # No commands
         )
 
         # Execute request should raise ValueError
-        with pytest.raises(ValueError, match="At least one command is required"):
+        with pytest.raises(
+            ValueError, match="At least one command is required"
+        ):
             await ExecutionService.execute_request(request)
 
         # Limiter should not be called for invalid requests
@@ -171,58 +175,70 @@ class TestExecuteRequest:
     @pytest.mark.asyncio
     @patch("code_execution.server.service.RunnerRegistry.get_runner")
     @patch("code_execution.server.service.get_concurrency_limiter")
-    async def test_execute_request_no_runner(self, mock_get_limiter, mock_get_runner):
+    async def test_execute_request_no_runner(
+        self, mock_get_limiter, mock_get_runner
+    ):
         """Test request execution when no runner found."""
         # Setup mocks
         mock_get_runner.side_effect = KeyError("subprocess")
-        
-        mock_limiter = AsyncMock()
-        mock_limiter.acquire.return_value = "exec_123"
+
+        mock_limiter = MagicMock()
+        mock_limiter.acquire = AsyncMock(return_value="exec_123")
+        mock_limiter.release = AsyncMock()
+        mock_limiter.get_queue_info.return_value = {"current_executions": 1}
         mock_get_limiter.return_value = mock_limiter
 
         # Create request
         request = ExecuteRequest(
             files={"test.py": "print('test')"},
-            commands=[Command(command=["python", "test.py"])]
+            commands=[Command(command=["python", "test.py"])],
         )
 
         # Execute request should raise RuntimeError
-        with pytest.raises(RuntimeError, match="No runner found for executable type"):
+        with pytest.raises(
+            RuntimeError, match="No runner found for executable type"
+        ):
             await ExecutionService.execute_request(request)
-            
+
         # Should still release the acquired slot
         mock_limiter.release.assert_called_once_with("exec_123")
 
     @pytest.mark.asyncio
     @patch("code_execution.server.service.RunnerRegistry.get_runner")
     @patch("code_execution.server.service.get_concurrency_limiter")
-    async def test_execute_request_runner_failure(self, mock_get_limiter, mock_get_runner):
+    async def test_execute_request_runner_failure(
+        self, mock_get_limiter, mock_get_runner
+    ):
         """Test request execution when runner fails."""
         # Setup mocks
         mock_runner = AsyncMock(side_effect=Exception("Runner failed"))
         mock_get_runner.return_value = mock_runner
-        
-        mock_limiter = AsyncMock()
-        mock_limiter.acquire.return_value = "exec_123"
+
+        mock_limiter = MagicMock()
+        mock_limiter.acquire = AsyncMock(return_value="exec_123")
+        mock_limiter.release = AsyncMock()
+        mock_limiter.get_queue_info.return_value = {"current_executions": 1}
         mock_get_limiter.return_value = mock_limiter
 
         # Create request
         request = ExecuteRequest(
             files={"test.py": "print('test')"},
-            commands=[Command(command=["python", "test.py"])]
+            commands=[Command(command=["python", "test.py"])],
         )
 
         # Execute request should raise RuntimeError
         with pytest.raises(RuntimeError, match="Execution failed"):
             await ExecutionService.execute_request(request)
-            
+
         # Should still release the acquired slot
         mock_limiter.release.assert_called_once_with("exec_123")
 
     @pytest.mark.asyncio
     @patch("code_execution.server.service.RunnerRegistry.get_runner")
     @patch("code_execution.server.service.get_concurrency_limiter")
-    async def test_execute_request_with_early_stopping(self, mock_get_limiter, mock_get_runner):
+    async def test_execute_request_with_early_stopping(
+        self, mock_get_limiter, mock_get_runner
+    ):
         """Test request execution with early stopping enabled."""
         # Setup mocks
         mock_result = ExecutableResult(
@@ -232,17 +248,18 @@ class TestExecuteRequest:
                     return_code=1,
                     runtime=0.05,
                     timed_out=False,
-                    stderr="Error occurred"
+                    stderr="Error occurred",
                 )
             ],
             elapsed=0.06,
-            tracked_files={}
+            tracked_files={},
         )
         mock_runner = AsyncMock(return_value=mock_result)
         mock_get_runner.return_value = mock_runner
-        
-        mock_limiter = AsyncMock()
-        mock_limiter.acquire.return_value = "exec_123"
+
+        mock_limiter = MagicMock()
+        mock_limiter.acquire = AsyncMock(return_value="exec_123")
+        mock_limiter.release = AsyncMock()
         mock_limiter.get_queue_info.return_value = {"current_executions": 1}
         mock_get_limiter.return_value = mock_limiter
 
@@ -251,9 +268,9 @@ class TestExecuteRequest:
             files={"test.py": "raise ValueError('test error')"},
             commands=[
                 Command(command=["python", "test.py"]),
-                Command(command=["echo", "should not run"])
+                Command(command=["echo", "should not run"]),
             ],
-            early_stopping=True
+            early_stopping=True,
         )
 
         # Execute request
@@ -261,7 +278,7 @@ class TestExecuteRequest:
 
         # Assert results
         assert result == mock_result
-        
+
         # Verify executable was configured with early stopping
         called_executable = mock_runner.call_args[0][0]
         assert called_executable.early_stopping is True
@@ -269,7 +286,9 @@ class TestExecuteRequest:
     @pytest.mark.asyncio
     @patch("code_execution.server.service.RunnerRegistry.get_runner")
     @patch("code_execution.server.service.get_concurrency_limiter")
-    async def test_execute_request_with_tracked_files(self, mock_get_limiter, mock_get_runner):
+    async def test_execute_request_with_tracked_files(
+        self, mock_get_limiter, mock_get_runner
+    ):
         """Test request execution with tracked files."""
         # Setup mocks
         mock_result = ExecutableResult(
@@ -279,25 +298,28 @@ class TestExecuteRequest:
                     return_code=0,
                     runtime=0.02,
                     timed_out=False,
-                    stderr=""
+                    stderr="",
                 )
             ],
             elapsed=0.03,
-            tracked_files={"output.txt": "Generated content"}
+            tracked_files={"output.txt": "Generated content"},
         )
         mock_runner = AsyncMock(return_value=mock_result)
         mock_get_runner.return_value = mock_runner
-        
-        mock_limiter = AsyncMock()
-        mock_limiter.acquire.return_value = "exec_123"
+
+        mock_limiter = MagicMock()
+        mock_limiter.acquire = AsyncMock(return_value="exec_123")
+        mock_limiter.release = AsyncMock()
         mock_limiter.get_queue_info.return_value = {"current_executions": 1}
         mock_get_limiter.return_value = mock_limiter
 
         # Create request with tracked files
         request = ExecuteRequest(
-            files={"script.py": "with open('output.txt', 'w') as f: f.write('Generated content')"},
+            files={
+                "script.py": "with open('output.txt', 'w') as f: f.write('Generated content')"
+            },
             commands=[Command(command=["python", "script.py"])],
-            tracked_files=["output.txt"]
+            tracked_files=["output.txt"],
         )
 
         # Execute request
@@ -306,7 +328,7 @@ class TestExecuteRequest:
         # Assert results
         assert result == mock_result
         assert "output.txt" in result.tracked_files
-        
+
         # Verify executable was configured with tracked files
         called_executable = mock_runner.call_args[0][0]
         assert called_executable.tracked_files == ["output.txt"]

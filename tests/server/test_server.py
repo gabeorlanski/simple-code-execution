@@ -21,7 +21,7 @@ class TestHealthEndpoint:
     def test_health_check(self):
         """Test that health endpoint returns healthy status."""
         response = client.get("/health")
-        
+
         assert response.status_code == 200
         assert response.json() == {"status": "healthy"}
 
@@ -40,11 +40,11 @@ class TestExecuteEndpoint:
                     return_code=0,
                     runtime=0.1,
                     timed_out=False,
-                    stderr=""
+                    stderr="",
                 )
             ],
             elapsed=0.12,
-            tracked_files={}
+            tracked_files={},
         )
         mock_metadata = {"execution_id": "exec_1", "queue_info": {}}
         mock_execute.return_value = (mock_result, mock_metadata)
@@ -55,18 +55,20 @@ class TestExecuteEndpoint:
             "commands": [{"command": ["python", "hello.py"], "timeout": 30}],
             "executable_type": "subprocess",
             "early_stopping": False,
-            "tracked_files": []
+            "tracked_files": [],
         }
-        
+
         response = client.post("/execute", json=request_data)
-        
+
         # Assert response
         assert response.status_code == 200
         response_data = response.json()
         assert response_data["success"] is True
         assert "result" in response_data
         assert len(response_data["result"]["results"]) == 1
-        assert response_data["result"]["results"][0]["output"] == "Hello World!\n"
+        assert (
+            response_data["result"]["results"][0]["output"] == "Hello World!\n"
+        )
         assert response_data["result"]["elapsed"] == 0.12
 
     @patch("code_execution.server.service.ExecutionService.execute_request")
@@ -80,37 +82,44 @@ class TestExecuteEndpoint:
                     return_code=0,
                     runtime=0.05,
                     timed_out=False,
-                    stderr=""
+                    stderr="",
                 )
             ],
             elapsed=0.06,
-            tracked_files={"output.txt": "Generated content"}
+            tracked_files={"output.txt": "Generated content"},
         )
         mock_metadata = {"execution_id": "exec_2", "queue_info": {}}
         mock_execute.return_value = (mock_result, mock_metadata)
 
         # Make request
         request_data = {
-            "files": {"script.py": "with open('output.txt', 'w') as f: f.write('Generated content')"},
+            "files": {
+                "script.py": "with open('output.txt', 'w') as f: f.write('Generated content')"
+            },
             "commands": [{"command": ["python", "script.py"], "timeout": 30}],
             "executable_type": "subprocess",
             "early_stopping": False,
-            "tracked_files": ["output.txt"]
+            "tracked_files": ["output.txt"],
         }
-        
+
         response = client.post("/execute", json=request_data)
-        
+
         # Assert response
         assert response.status_code == 200
         response_data = response.json()
         assert response_data["success"] is True
-        assert response_data["result"]["tracked_files"]["output.txt"] == "Generated content"
+        assert (
+            response_data["result"]["tracked_files"]["output.txt"]
+            == "Generated content"
+        )
 
     @patch("code_execution.server.service.ExecutionService.execute_request")
     def test_execute_validation_error(self, mock_execute):
         """Test execution with validation error."""
         # Setup mock to raise ValueError
-        mock_execute.side_effect = ValueError("At least one command is required")
+        mock_execute.side_effect = ValueError(
+            "At least one command is required"
+        )
 
         # Make request with invalid data
         request_data = {
@@ -118,11 +127,11 @@ class TestExecuteEndpoint:
             "commands": [],  # Empty commands should cause validation error
             "executable_type": "subprocess",
             "early_stopping": False,
-            "tracked_files": []
+            "tracked_files": [],
         }
-        
+
         response = client.post("/execute", json=request_data)
-        
+
         # Assert error response
         assert response.status_code == 400
         response_data = response.json()
@@ -133,7 +142,9 @@ class TestExecuteEndpoint:
     def test_execute_runtime_error(self, mock_execute):
         """Test execution with runtime error."""
         # Setup mock to raise RuntimeError
-        mock_execute.side_effect = RuntimeError("Execution failed: Command not found")
+        mock_execute.side_effect = RuntimeError(
+            "Execution failed: Command not found"
+        )
 
         # Make request
         request_data = {
@@ -141,11 +152,11 @@ class TestExecuteEndpoint:
             "commands": [{"command": ["nonexistent_command"], "timeout": 30}],
             "executable_type": "subprocess",
             "early_stopping": False,
-            "tracked_files": []
+            "tracked_files": [],
         }
-        
+
         response = client.post("/execute", json=request_data)
-        
+
         # Assert error response
         assert response.status_code == 500
         response_data = response.json()
@@ -157,9 +168,9 @@ class TestExecuteEndpoint:
         response = client.post(
             "/execute",
             data="invalid json",
-            headers={"Content-Type": "application/json"}
+            headers={"Content-Type": "application/json"},
         )
-        
+
         assert response.status_code == 422
 
     def test_execute_missing_required_fields(self):
@@ -168,9 +179,9 @@ class TestExecuteEndpoint:
             "files": {"test.py": "print('test')"}
             # Missing commands field
         }
-        
+
         response = client.post("/execute", json=request_data)
-        
+
         assert response.status_code == 422
         response_data = response.json()
         assert "detail" in response_data
@@ -178,14 +189,13 @@ class TestExecuteEndpoint:
     def test_get_queue_status(self):
         """Test getting queue status."""
         response = client.get("/queue/status")
-        
+
         assert response.status_code == 200
         response_data = response.json()
         assert "current_executions" in response_data
         assert "max_concurrency" in response_data
         assert "queue_size" in response_data
         assert "available_slots" in response_data
-
 
     @patch("code_execution.server.service.ExecutionService.execute_request")
     def test_execute_with_default_values(self, mock_execute):
@@ -198,11 +208,11 @@ class TestExecuteEndpoint:
                     return_code=0,
                     runtime=0.01,
                     timed_out=False,
-                    stderr=""
+                    stderr="",
                 )
             ],
             elapsed=0.02,
-            tracked_files={}
+            tracked_files={},
         )
         mock_metadata = {"execution_id": "exec_3", "queue_info": {}}
         mock_execute.return_value = (mock_result, mock_metadata)
@@ -210,23 +220,24 @@ class TestExecuteEndpoint:
         # Make minimal request (should use defaults)
         request_data = {
             "files": {"test.py": "print('Success')"},
-            "commands": [{"command": ["python", "test.py"]}]  # No timeout specified
+            "commands": [
+                {"command": ["python", "test.py"]}
+            ],  # No timeout specified
         }
-        
+
         response = client.post("/execute", json=request_data)
-        
+
         # Assert response
         assert response.status_code == 200
         response_data = response.json()
         assert response_data["success"] is True
-        
+
         # Verify the service was called with defaults
         mock_execute.assert_called_once()
         called_request = mock_execute.call_args[0][0]
         assert called_request.executable_type == "subprocess"
         assert called_request.early_stopping is False
         assert called_request.tracked_files == []
-        assert called_request.priority == 5  # default priority
 
     @patch("code_execution.server.service.ExecutionService.execute_request")
     def test_execute_unexpected_error(self, mock_execute):
@@ -240,14 +251,16 @@ class TestExecuteEndpoint:
             "commands": [{"command": ["python", "test.py"], "timeout": 30}],
             "executable_type": "subprocess",
             "early_stopping": False,
-            "tracked_files": []
+            "tracked_files": [],
         }
-        
+
         response = client.post("/execute", json=request_data)
-        
+
         # Assert error response
         assert response.status_code == 500
         response_data = response.json()
         assert "error" in response_data["detail"]
         assert response_data["detail"]["error"] == "Internal Server Error"
-        assert response_data["detail"]["details"] == "An unexpected error occurred"
+        assert (
+            response_data["detail"]["details"] == "An unexpected error occurred"
+        )

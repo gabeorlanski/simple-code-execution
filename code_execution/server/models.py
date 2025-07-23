@@ -21,41 +21,33 @@ class ExecuteRequest(BaseModel):
     )
     executable_type: Optional[str] = Field(
         default="subprocess",
-        description="Type of executable to use (defaults to 'subprocess')"
+        description="Type of executable to use (defaults to 'subprocess')",
     )
     early_stopping: bool = Field(
         default=False,
-        description="Whether to stop execution on first command failure"
+        description="Whether to stop execution on first command failure",
     )
     tracked_files: List[str] = Field(
         default_factory=list,
-        description="List of files to track after execution"
-    )
-    priority: int = Field(
-        default=5,
-        ge=1,
-        le=10,
-        description="Execution priority (1=highest, 10=lowest)"
+        description="List of files to track after execution",
     )
 
 
 class ExecuteResponse(BaseModel):
     """Response model for successful execution."""
 
-    success: bool = Field(default=True, description="Whether execution succeeded")
+    success: bool = Field(
+        default=True, description="Whether execution succeeded"
+    )
     result: ExecutableResult = Field(description="Execution result details")
-    queue_position: Optional[int] = Field(
-        default=None, description="Position in execution queue (if queued)"
-    )
-    estimated_wait_time: Optional[float] = Field(
-        default=None, description="Estimated wait time in seconds (if queued)"
-    )
 
 
 class ErrorResponse(BaseModel):
     """Response model for errors."""
 
-    success: bool = Field(default=False, description="Whether execution succeeded")
+    success: bool = Field(
+        default=False, description="Whether execution succeeded"
+    )
     error: str = Field(description="Error message")
     details: Optional[str] = Field(
         default=None, description="Additional error details"

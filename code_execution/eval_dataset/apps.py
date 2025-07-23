@@ -1,4 +1,4 @@
-""" Module for evaluating apps dataset. """
+"""Module for evaluating apps dataset."""
 
 import logging
 from functools import partial
@@ -15,7 +15,7 @@ from code_execution.entrypoints import execute_predictions
 from code_execution.eval_dataset import eval_utils
 from code_execution.eval_dataset.metrics import estimate_pass_at_k
 from code_execution.execution import ExecutionConfig
-from code_execution.utils import get_mem_limit_code
+from code_execution.utils.utils import get_mem_limit_code
 
 logger = logging.getLogger(__name__)
 NO_FN_NAME = "__NO_FN_NAME__"

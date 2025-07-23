@@ -20,7 +20,7 @@ from code_execution.data_structures import Command
 from code_execution.data_structures import CommandResult
 from code_execution.data_structures import CommandsToRun
 from code_execution.data_structures import ExecutionResult
-from code_execution.utils import get_results_from_generator
+from code_execution.utils.utils import get_results_from_generator
 
 logger = logging.getLogger(__name__)
 

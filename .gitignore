@@ -164,3 +164,4 @@ cython_debug/
 scratch/*
 .cursor/*
 .claude/*
+CLAUDE.md

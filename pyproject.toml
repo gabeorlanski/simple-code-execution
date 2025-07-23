@@ -12,7 +12,13 @@ dependencies = [
     "numpy>=1.26",
     "aiofiles>=22.1.0",
     "tqdm>=4.60.0",
-    "ujson>=5.10.0"
+    "ujson>=5.10.0",
+    "pydantic>=2.11.7",
+    "fastapi>=0.116.1",
+    "uvicorn>=0.35.0",
+    "aiohttp>=3.12.14",
+    "tenacity>=9.1.2",
+    "structlog>=25.4.0",
 ]
 license = {file = "LICENSE"}
 
@@ -29,14 +35,14 @@ profile='black'
 single_line_exclusions = ["typing"]
 force_single_line = true
 skip = [".gitignore", ".dockerignore"]
-extend_skip_glob = [".vscode/*","scratch/*","debug_code/*", "repos/*", "data/*"]
+extend_skip_glob = [".vscode/*","scratch/*","debug_code/*", "repos/*", "data/*",".venv/*",".pytest_cache/*", ".cache/*",".local/*"]
 line_length = 80
 
 [tool.black]
 line-length=80
 extend-exclude='''
 (
-    ^/repos/*|^/data/*|^/scratch/linting/*
+    ^/repos/*|^/data/*|^/scratch/linting/*|^/\.venv/*|^/\.pytest_cache/*|^/\.cache/*|^/\.local/*
 )'''
 
 [tool.pylint]
@@ -54,5 +60,9 @@ pythonpath = [
 
 [dependency-groups]
 dev = [
+    "black>=25.1.0",
+    "isort>=6.0.1",
     "pytest>=8.4.1",
+    "pytest-asyncio>=1.1.0",
+    "httpx>=0.25.0",
 ]

@@ -14,13 +14,42 @@ import signal
 import threading
 import time
 from pathlib import Path
-from typing import Callable, Dict, Generator, List, Optional, Tuple
+from typing import (
+    Any,
+    Callable,
+    Coroutine,
+    Dict,
+    Generator,
+    List,
+    Optional,
+    Tuple,
+    TypeVar,
+)
 
+import structlog
 from tqdm import tqdm
 
-from code_execution import utility_modules
+logger = structlog.get_logger()
 
-logger = logging.getLogger(__name__)
+
+# Taken from https://github.com/bytedance/SandboxFusion/blob/main/sandbox/utils/execution.py
+T = TypeVar("T", bound=Callable[..., Coroutine[Any, Any, Any]])
+
+
+def max_concurrency(limit: int) -> Callable[[T], T]:
+    """Decorator to limit the maximum number of concurrent executions of an async function"""
+    semaphore = asyncio.Semaphore(limit)
+
+    def decorator(func: T) -> T:
+
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            async with semaphore:
+                return await func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
 
 
 def in_notebook():

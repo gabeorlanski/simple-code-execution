@@ -1,11 +1,13 @@
 """This module contains the SubprocessExecutable class, which is used to execute commands using subprocesses."""
 
+import asyncio
 import pathlib
 import subprocess
 import tempfile
 import time
 from typing import Dict, List, Literal, Optional
 
+import aiofiles
 import structlog
 from pydantic import BaseModel
 
@@ -94,8 +96,26 @@ def _execute(
     )
 
 
+async def _write_files_async(
+    temp_dir: pathlib.Path, files: dict[str, str]
+) -> None:
+    """Writes files asynchronously to the temporary directory."""
+
+    async def write_single_file(file_name: str, file_content: str) -> None:
+        logger.debug("Writing file: %s", file_name)
+        async with aiofiles.open(temp_dir / file_name, "w") as f:
+            await f.write(file_content)
+
+    await asyncio.gather(
+        *[
+            write_single_file(file_name, file_content)
+            for file_name, file_content in files.items()
+        ]
+    )
+
+
 @base.RunnerRegistry.register("subprocess")
-async def execute_subprocess(
+async def execute_subprocess_async(
     executable: SubprocessExecutable,
 ) -> SubprocessExecutableResult:
     """Executes the subprocess executable."""
@@ -103,9 +123,10 @@ async def execute_subprocess(
     results = []
     with tempfile.TemporaryDirectory(prefix="subproc_execution_") as temp_dir:
         temp_dir = pathlib.Path(temp_dir)
-        for file_name, file_content in executable.files.items():
-            logger.debug("Writing file: %s", file_name)
-            (temp_dir / file_name).write_text(file_content)
+
+        # Write files asynchronously but wait for completion before proceeding
+        await _write_files_async(temp_dir, executable.files)
+
         t0 = time.time()
         for command in executable.commands:
             logger.debug("Executing command: %s", command.command)
@@ -127,3 +148,10 @@ async def execute_subprocess(
         elapsed=t1 - t0,
         tracked_files=tracked_files,
     )
+
+
+def execute_subprocess(
+    executable: SubprocessExecutable,
+) -> SubprocessExecutableResult:
+    """Synchronous wrapper for execute_subprocess."""
+    return asyncio.run(execute_subprocess_async(executable))

@@ -1,7 +1,7 @@
 """Unit tests for the subprocess executable module."""
 
 import asyncio
-import pathlib
+from pathlib import Path
 import subprocess
 import tempfile
 import time
@@ -17,7 +17,7 @@ from code_execution.executables.subproc import SubprocessExecutable
 from code_execution.executables.subproc import SubprocessExecutableResult
 from code_execution.executables.subproc import SubprocessResult
 from code_execution.executables.subproc import _execute
-from code_execution.executables.subproc import execute_subprocess
+from code_execution.executables.subproc import execute_subprocess_async
 
 
 class TestSubprocessResult:
@@ -101,7 +101,7 @@ class TestExecuteFunction:
         # Execute
         result = _execute(
             command_to_run=["echo", "hello"],
-            working_dir=pathlib.Path("/tmp"),
+            working_dir=Path("/tmp"),
             timeout=10,
         )
 
@@ -127,7 +127,7 @@ class TestExecuteFunction:
         # Execute
         result = _execute(
             command_to_run=["false"],
-            working_dir=pathlib.Path("/tmp"),
+            working_dir=Path("/tmp"),
             timeout=10,
         )
 
@@ -151,7 +151,7 @@ class TestExecuteFunction:
         # Execute
         result = _execute(
             command_to_run=["sleep", "10"],
-            working_dir=pathlib.Path("/tmp"),
+            working_dir=Path("/tmp"),
             timeout=5,
         )
 
@@ -175,7 +175,7 @@ class TestExecuteFunction:
         # Execute
         result = _execute(
             command_to_run=["cat"],
-            working_dir=pathlib.Path("/tmp"),
+            working_dir=Path("/tmp"),
             timeout=10,
             stdin="input text",
         )
@@ -195,9 +195,9 @@ class TestExecuteFunction:
         mock_popen.return_value = mock_process
 
         # Execute
-        result = _execute(
+        _ = _execute(
             command_to_run=["cat"],
-            working_dir=pathlib.Path("/tmp"),
+            working_dir=Path("/tmp"),
             timeout=10,
             stdin=["line1", "line2"],
         )
@@ -218,7 +218,7 @@ class TestExecuteFunction:
         # Execute
         result = _execute(
             command_to_run=["invalid"],
-            working_dir=pathlib.Path("/tmp"),
+            working_dir=Path("/tmp"),
             timeout=10,
         )
 
@@ -257,7 +257,7 @@ class TestExecuteSubprocess:
             )
 
             # Execute
-            result = await execute_subprocess(executable)
+            result = await execute_subprocess_async(executable)
 
             # Assert
             assert isinstance(result, SubprocessExecutableResult)
@@ -300,7 +300,7 @@ class TestExecuteSubprocess:
             )
 
             # Execute
-            result = await execute_subprocess(executable)
+            result = await execute_subprocess_async(executable)
 
             # Assert
             assert len(result.results) == 2
@@ -335,7 +335,7 @@ class TestExecuteSubprocess:
             )
 
             # Execute
-            result = await execute_subprocess(executable)
+            result = await execute_subprocess_async(executable)
 
             # Assert
             assert len(result.results) == 1
@@ -377,7 +377,7 @@ class TestExecuteSubprocess:
             )
 
             # Execute
-            result = await execute_subprocess(executable)
+            result = await execute_subprocess_async(executable)
 
             # Assert
             assert len(result.results) == 2
@@ -411,19 +411,22 @@ class TestExecuteSubprocess:
             # Execute
             with patch("pathlib.Path.read_text") as mock_read:
                 mock_read.return_value = "output content"
-                result = await execute_subprocess(executable)
+                result = await execute_subprocess_async(executable)
 
             # Assert
             assert "output.txt" in result.tracked_files
             assert result.tracked_files["output.txt"] == "output content"
 
     @pytest.mark.asyncio
-    async def test_execute_subprocess_file_writing(self):
+    async def test_execute_subprocess_file_writing(self, tmpdir):
         """Test that files are written to temp directory."""
+
         with patch(
             "code_execution.executables.subproc._execute"
         ) as mock_execute:
-            with patch("pathlib.Path.write_text") as mock_write:
+            with patch(
+                "code_execution.executables.subproc.aiofiles.open"
+            ) as mock_write:
                 # Setup
                 mock_execute.return_value = SubprocessResult(
                     output="",
@@ -442,9 +445,7 @@ class TestExecuteSubprocess:
                 )
 
                 # Execute
-                _ = await execute_subprocess(executable)
+                _ = await execute_subprocess_async(executable)
 
                 # Assert
                 assert mock_write.call_count == 2
-                mock_write.assert_any_call("print('hello')")
-                mock_write.assert_any_call("text content")

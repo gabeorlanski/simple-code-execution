@@ -5,7 +5,7 @@ from typing import Dict, List, Tuple
 import structlog
 
 from code_execution.executables.base import ExecutableResult
-from code_execution.executables.base import RunnerRegistry
+from code_execution.executables.base import RunnerRegistry, AsyncRunnerRegistry
 from code_execution.executables.subproc import SubprocessExecutable
 from code_execution.server.concurrency import get_concurrency_limiter
 from code_execution.server.models import ExecuteRequest

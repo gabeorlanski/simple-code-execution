@@ -57,18 +57,21 @@ class RunnerRegistry:
     runners: Dict[str, Callable[[BaseExecutable], ExecutableResult]] = {}
 
     @classmethod
-    def register(cls, name: str) -> None:
+    def register(
+        cls,
+        name: str,
+        normal_runner: Callable[[BaseExecutable], ExecutableResult],
+        async_runner: Callable[[BaseExecutable], ExecutableResult],
+    ) -> None:
         """Registers a runner."""
-
-        def wrapper(func: Callable[[BaseExecutable], ExecutableResult]) -> None:
-            cls.runners[name] = func
-            return func
-
-        return wrapper
+        cls.runners[name] = {
+            "normal": normal_runner,
+            "async": async_runner,
+        }
 
     @classmethod
     def get_runner(
-        cls, name: str
+        cls, name: str, async_mode: bool = False
     ) -> Callable[[BaseExecutable], ExecutableResult]:
         """Gets a runner."""
-        return cls.runners[name]
+        return cls.runners[name]["async" if async_mode else "normal"]

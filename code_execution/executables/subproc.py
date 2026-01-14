@@ -114,35 +114,28 @@ async def _write_files_async(
     )
 
 
-@base.RunnerRegistry.register("subprocess")
-async def execute_subprocess_async(
+def _execute_commands(
     executable: SubprocessExecutable,
+    temp_dir: pathlib.Path,
 ) -> SubprocessExecutableResult:
-    """Executes the subprocess executable."""
-    logger.info("Executing subprocess executable: %s", repr(executable))
+    """Executes a list of commands."""
     results = []
-    with tempfile.TemporaryDirectory(prefix="subproc_execution_") as temp_dir:
-        temp_dir = pathlib.Path(temp_dir)
-
-        # Write files asynchronously but wait for completion before proceeding
-        await _write_files_async(temp_dir, executable.files)
-
-        t0 = time.time()
-        for command in executable.commands:
-            logger.debug("Executing command: %s", command.command)
-            res = _execute(
-                command.command, temp_dir, command.timeout, stdin=command.stdin
-            )
-            results.append(res)
-            if executable.early_stopping and res.had_error:
-                logger.debug("Early stopping due to error")
-                break
-        t1 = time.time()
-        logger.debug("Execution time: %s", t1 - t0)
-        tracked_files = {}
-        for tracked_file in executable.tracked_files:
-            logger.debug("Reading tracked file: %s", tracked_file)
-            tracked_files[tracked_file] = (temp_dir / tracked_file).read_text()
+    t0 = time.time()
+    for command in executable.commands:
+        logger.debug("Executing command: %s", command.command)
+        res = _execute(
+            command.command, temp_dir, command.timeout, stdin=command.stdin
+        )
+        results.append(res)
+        if executable.early_stopping and res.had_error:
+            logger.debug("Early stopping due to error")
+            break
+    t1 = time.time()
+    logger.debug("Execution time: %s", t1 - t0)
+    tracked_files = {}
+    for tracked_file in executable.tracked_files:
+        logger.debug("Reading tracked file: %s", tracked_file)
+        tracked_files[tracked_file] = (temp_dir / tracked_file).read_text()
     return SubprocessExecutableResult(
         results=results,
         elapsed=t1 - t0,
@@ -150,8 +143,39 @@ async def execute_subprocess_async(
     )
 
 
+async def execute_subprocess_async(
+    executable: SubprocessExecutable,
+) -> SubprocessExecutableResult:
+    """Executes the subprocess executable."""
+    logger.info("Executing subprocess executable: %s", repr(executable))
+    with tempfile.TemporaryDirectory(prefix="subproc_execution_") as temp_dir:
+        temp_dir = pathlib.Path(temp_dir)
+
+        # Write files asynchronously but wait for completion before proceeding
+        await _write_files_async(temp_dir, executable.files)
+
+        result = _execute_commands(executable, temp_dir)
+    return result
+
+
 def execute_subprocess(
     executable: SubprocessExecutable,
 ) -> SubprocessExecutableResult:
     """Synchronous wrapper for execute_subprocess."""
-    return asyncio.run(execute_subprocess_async(executable))
+    logger.info("Executing subprocess executable: %s", repr(executable))
+    with tempfile.TemporaryDirectory(prefix="subproc_execution_") as temp_dir:
+        temp_dir = pathlib.Path(temp_dir)
+        # Write files
+        for file_name, file_content in executable.files.items():
+            with open(temp_dir / file_name, "w") as f:
+                f.write(file_content)
+
+        result = _execute_commands(executable, temp_dir)
+    return result
+
+
+base.RunnerRegistry.register(
+    "subprocess",
+    execute_subprocess,
+    execute_subprocess_async,
+)
